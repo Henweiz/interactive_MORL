@@ -391,7 +391,7 @@ class IGMORL(MOAgent):
         assert isinstance(self.action_space, gym.spaces.Box), "only continuous action space is supported"
         self.tmp_env.close()
         self.gamma = gamma
-        self.limits = origin
+        self.bounds = origin
 
         # EA parameters
         self.pop_size = pop_size
@@ -737,7 +737,9 @@ class IGMORL(MOAgent):
         individuals_by_id = {}
 
         if len(self.archive.individuals) < 2:
+            print("Not enough individuals in the archive to select from.")
             return
+        print("\nCurrent Pareto Front:")
         
         for a, evaluation in zip(self.archive.individuals, self.archive.evaluations):
             scalarized = np.dot(evaluation, np.array([1.0, 1.0]))
@@ -757,7 +759,7 @@ class IGMORL(MOAgent):
         # Allow the user to select an individual
         while True:
             try:
-                selected_id = input("\nEnter the Agent ID to inspect: ").strip()
+                selected_id = input("\nEnter the preferred Agent ID to continue: ").strip()
                 
                 # Convert ID to the expected type (assuming int, change if necessary)
                 selected_id = int(selected_id)
@@ -784,7 +786,8 @@ class IGMORL(MOAgent):
                     print(f"ID: {selected_agent.id}")
                     print(f"Weights: {selected_agent.np_weights}")
                     print(f"Evaluation: {evaluations[idx]}")
-                    self.limits = evaluations[idx] * 1.2 # Update the limits with a small delta value
+                    self.bounds = evaluations[idx] * 1.2 # Update the limits with a small delta value
+                    return
                 else:
                     print("Invalid ID. Please enter a valid Agent ID.")
 
