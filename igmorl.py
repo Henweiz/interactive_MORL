@@ -258,6 +258,22 @@ class PerformanceBuffer:
     def individuals(self) -> list:
         """Returns the individuals in the buffer."""
         return [i for l in self.bins for i in l]
+    
+    def filtered_evaluations(self, bounds) -> List[np.ndarray]:
+        """Returns evaluations of valid individuals (filtered)."""
+        return [e for e in self.evaluations if np.all(e >= bounds)]
+
+
+    def filtered_individuals(self, bounds) -> list:
+        """Returns valid individuals (filtered)."""
+        filtered = []
+        for bin_individuals, bin_evals in zip(self.bins, self.bins_evals):
+            for ind, eval in zip(bin_individuals, bin_evals):
+                if np.all(eval >= bounds):
+                    filtered.append(ind)
+        return filtered
+
+
 
     def add(self, candidate, evaluation: np.ndarray):
         """Adds a candidate to the buffer.
@@ -566,8 +582,8 @@ class IGMORL(MOAgent):
         self.np_random.shuffle(candidate_weights)  # Randomize
 
         current_front = deepcopy(self.archive.evaluations)
-        population = self.population.individuals
-        population_eval = self.population.evaluations
+        population = self.population.filtered_individuals(self.bounds)
+        population_eval = self.population.filtered_evaluations(self.bounds)
         selected_tasks = []
         # For each worker, select a (policy, weight) tuple
         for i in range(len(self.agents)):
@@ -597,7 +613,7 @@ class IGMORL(MOAgent):
                 )
                 # optimization criterion is a hypervolume - sparsity
                 mixture_metrics = [
-                    hypervolume(ref_point, current_front + [predicted_eval]) #- sparsity(current_front + [predicted_eval])
+                    hypervolume(ref_point, current_front + [predicted_eval]) - sparsity(current_front + [predicted_eval])
                     for predicted_eval in predicted_evals
                 ]
                 # Best among all the weights for the current candidate
@@ -617,7 +633,7 @@ class IGMORL(MOAgent):
             selected_tasks.append((tuple(best_eval), tuple(best_candidate[1])))
             # Append current estimate to the estimated front (to compute the next predictions)
             current_front.append(best_predicted_eval)
-
+            
             # Assigns best predicted (weight-agent) pair to the worker
             copied_agent = deepcopy(best_candidate[0])
             copied_agent.global_step = self.agents[i].global_step
@@ -630,7 +646,7 @@ class IGMORL(MOAgent):
                 f"current eval: {best_eval} - estimated next: {best_predicted_eval} - deltas {(best_predicted_eval - best_eval)}"
             )
             
-        self.user_select()
+        
 
     
     def train(
@@ -726,6 +742,8 @@ class IGMORL(MOAgent):
                     known_pareto_front=known_pareto_front,
                 )
                 evolutionary_generation += 1
+                pref_agent = self.user_select()
+                print(f"New lower bounds: {self.bounds}")
 
         print("Done training!")
         self.env.close()
@@ -743,11 +761,11 @@ class IGMORL(MOAgent):
         
         for a, evaluation in zip(self.archive.individuals, self.archive.evaluations):
             scalarized = np.dot(evaluation, np.array([1.0, 1.0]))
-            discounted_scalarized = np.dot(evaluation, a.np_weights)
+            #discounted_scalarized = np.dot(evaluation, a.np_weights)
             agent_id = int(a.id)
             print(f"\nAgent #{a.id}")
             print(f"Scalarized: {scalarized}")
-            print(f"Discounted scalarized: {discounted_scalarized}")
+            #print(f"Discounted scalarized: {discounted_scalarized}")
             print(f"Vectorial: {evaluation}")
             print(f"Current Weights: {a.np_weights}")
 
@@ -777,7 +795,7 @@ class IGMORL(MOAgent):
                         for i, ind in enumerate(individuals):
                             print(f"[{i}] evaluation: {evaluations[i]}")
 
-                        idx = int(input("\nSelect index of the agent: ").strip())
+                        idx = int(input("\nSelect index of the preferred agent: ").strip())
                         selected_agent = individuals[idx]
                     else:
                         selected_agent = individuals[idx]
@@ -787,7 +805,13 @@ class IGMORL(MOAgent):
                     print(f"Weights: {selected_agent.np_weights}")
                     print(f"Evaluation: {evaluations[idx]}")
                     self.bounds = evaluations[idx] * 1.2 # Update the limits with a small delta value
-                    return
+                    # Assigns best predicted (weight-agent) pair to the worker
+                    #copied_agent = deepcopy(best_candidate[0])
+                    #copied_agent.global_step = self.agents[i].global_step
+                    #copied_agent.id = i
+                    #copied_agent.change_weights(deepcopy(best_candidate[1]))
+                    #self.agents[i] = copied_agent
+                    return selected_agent
                 else:
                     print("Invalid ID. Please enter a valid Agent ID.")
 
