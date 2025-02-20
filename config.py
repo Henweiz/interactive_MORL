@@ -21,14 +21,14 @@ config_test = {
     'seed': 42,
     'ref_point': np.array([-110, -110]),
     'num_envs': 4,
-    'pop_size': 7,
+    'pop_size': 4,
     'warmup_iterations': 1,
-    'evolutionary_iterations': 5,
+    'evolutionary_iterations': 1,
     'num_weight_candidates': 50,
     'origin': np.array([-110, -110]),
     'steps_per_iteration': 100,
     'delta_weight': 0.2,
-    'total_timesteps': 50000,
+    'total_timesteps': 1000,
     'gamma': 0.995
 }
 

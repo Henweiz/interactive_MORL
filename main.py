@@ -1,4 +1,6 @@
+import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import gymnasium as gym
 import mo_gymnasium as mo_gym
@@ -21,7 +23,7 @@ register(
 # Create the water reservoir environment
 
 if __name__ == "__main__":
-    config_name = "config_test"  # Change to "config_2" for the other config
+    config_name = "config_1"  # Change to "config_2" for the other config
     config = load_config(config_name)
 
     # Initialize the algorithm using parameters from the selected configuration
@@ -36,7 +38,8 @@ if __name__ == "__main__":
         steps_per_iteration=config['steps_per_iteration'],
         delta_weight=config['delta_weight'],
         log=False,
-        seed=config['seed']
+        seed=config['seed'],
+        interactive=True,
     )
 
     print(len(algo.archive.individuals))
@@ -49,24 +52,53 @@ if __name__ == "__main__":
         known_pareto_front=None,
     )
     
-    env = make_env(config['env_id'], (SEED), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
+    env = make_env(config['env_id'], (config['seed']-1), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
 
     print(len(algo.archive.individuals))
+    
+
     all_rewards = []
+    # Initialize a list to store the data for each agent
+    agent_data = []
+
     # Execution of trained policies
     for a in algo.archive.individuals:
-        #scalarized, discounted_scalarized, reward, discounted_reward = eval_mo(
-        #    agent=a, env=env, w=np.array([1.0, 1.0]), render=False
-        #)
+        # Evaluate policy
         scalarized, discounted_scalarized, reward, discounted_reward = a.policy_eval(env, num_episodes=5, scalarization=np.dot, weights=np.array([1.0, 1.0]))
+
+        # Prepare agent data
+        agent_info = {
+            'Experiment': "interactive-dim_2-config_1",
+            'Agent ID': a.id,
+            'Scalarized': scalarized,
+            'Vectorial Reward': ";".join(map(str, reward)),  # Convert list to string for CSV
+            'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
+        }
+        
+        # Append agent data to the list
+        agent_data.append(agent_info)
+
+        # Optionally print to the console (as in your original code)
         print(f"Agent #{a.id}")
         print(f"Scalarized: {scalarized}")
-        print(f"Discounted scalarized: {discounted_scalarized}")
         print(f"Vectorial: {reward}")
-        print(f"Discounted vectorial: {discounted_reward}")
         print(f"Weights: {a.np_weights}")
-        all_rewards.append(reward)  # Store reward vector
 
+        # Store the reward vector
+        all_rewards.append(reward)
+
+    # Convert the list of agent data into a DataFrame
+    df = pd.DataFrame(agent_data)
+
+    # Save the DataFrame to an Excel file
+    output_file = 'agent_performance.csv'
+    # Check if file exists to avoid writing headers again
+    file_exists = os.path.isfile(output_file)
+
+    # Append data to CSV (without writing headers if the file already exists)
+    df.to_csv(output_file, mode='a', index=False, header=not file_exists)
+
+    print(f"Data has been written to {output_file}")
 
     # Convert to NumPy array for easy slicing
     all_rewards = np.array(all_rewards)

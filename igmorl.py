@@ -357,6 +357,7 @@ class IGMORL(MOAgent):
         gae_lambda: float = 0.95,
         device: Union[th.device, str] = "auto",
         group: Optional[str] = None,
+        interactive: bool = True,
     ):
         """Initializes the PGMORL agent.
 
@@ -445,6 +446,8 @@ class IGMORL(MOAgent):
         self.clip_vloss = clip_vloss
         self.gae_lambda = gae_lambda
         self.gae = gae
+        self.interactive = interactive
+        self.selected_agent = [None, None]
 
         # env setup
         if env is None:
@@ -552,7 +555,7 @@ class IGMORL(MOAgent):
     ):
         """Evaluates all agents and store their current performances on the buffer and pareto archive."""
         for i, agent in enumerate(self.agents):
-            _, _, _, discounted_reward = agent.policy_eval(eval_env, weights=agent.np_weights, log=self.log)
+            _, _, reward, discounted_reward = agent.policy_eval(eval_env, weights=agent.np_weights, log=self.log)
             # Storing current results
             self.population.add(agent, discounted_reward)
             self.archive.add(agent, discounted_reward)
@@ -586,6 +589,10 @@ class IGMORL(MOAgent):
         population_eval = self.population.filtered_evaluations(self.bounds)
         selected_tasks = []
         # For each worker, select a (policy, weight) tuple
+        if len(population) == 0:
+            population.append(self.selected_agent[0])
+            population_eval.append(self.selected_agent[1])
+            
         for i in range(len(self.agents)):
             max_improv = float("-inf")
             best_candidate = None
@@ -645,8 +652,6 @@ class IGMORL(MOAgent):
             print(
                 f"current eval: {best_eval} - estimated next: {best_predicted_eval} - deltas {(best_predicted_eval - best_eval)}"
             )
-            
-        
 
     
     def train(
@@ -742,8 +747,10 @@ class IGMORL(MOAgent):
                     known_pareto_front=known_pareto_front,
                 )
                 evolutionary_generation += 1
-                pref_agent = self.user_select()
-                print(f"New lower bounds: {self.bounds}")
+
+                if self.interactive:
+                    self.selected_agent = self.user_select()
+                    print(f"New lower bounds: {self.bounds}")
 
         print("Done training!")
         self.env.close()
@@ -804,14 +811,14 @@ class IGMORL(MOAgent):
                     print(f"ID: {selected_agent.id}")
                     print(f"Weights: {selected_agent.np_weights}")
                     print(f"Evaluation: {evaluations[idx]}")
-                    self.bounds = evaluations[idx] * 1.2 # Update the limits with a small delta value
+                    self.bounds = evaluations[idx] * 1.3 # Update the limits with a small delta value
                     # Assigns best predicted (weight-agent) pair to the worker
                     #copied_agent = deepcopy(best_candidate[0])
                     #copied_agent.global_step = self.agents[i].global_step
                     #copied_agent.id = i
                     #copied_agent.change_weights(deepcopy(best_candidate[1]))
                     #self.agents[i] = copied_agent
-                    return selected_agent
+                    return [selected_agent, evaluations[idx]]
                 else:
                     print("Invalid ID. Please enter a valid Agent ID.")
 
