@@ -13,6 +13,7 @@ from igmorl import IGMORL, make_env
 from config import *
 
 SEED = 42
+SAVE = False
 
 # Register the custom environment
 register(
@@ -39,10 +40,8 @@ if __name__ == "__main__":
         delta_weight=config['delta_weight'],
         log=False,
         seed=config['seed'],
-        interactive=True,
+        interactive=False,
     )
-
-    print(len(algo.archive.individuals))
 
     # Train the algorithm using parameters from the selected configuration
     algo.train(
@@ -61,17 +60,17 @@ if __name__ == "__main__":
     # Initialize a list to store the data for each agent
     agent_data = []
 
-    # Execution of trained policies
-    for a in algo.archive.individuals:
+    # Visualization of trained policies
+    for (a, e) in zip(algo.archive.individuals, algo.archive.evaluations):
         # Evaluate policy
-        scalarized, discounted_scalarized, reward, discounted_reward = a.policy_eval(env, num_episodes=5, scalarization=np.dot, weights=np.array([1.0, 1.0]))
-
+        #scalarized, discounted_scalarized, reward, discounted_reward = a.policy_eval(env, num_episodes=5, scalarization=np.dot, weights=np.array([1.0, 1.0]))
+        
         # Prepare agent data
         agent_info = {
             'Experiment': "interactive-dim_2-config_1",
             'Agent ID': a.id,
-            'Scalarized': scalarized,
-            'Vectorial Reward': ";".join(map(str, reward)),  # Convert list to string for CSV
+            #'#Scalarized': scalarized,
+            'Vectorial Reward': ";".join(map(str, e)),  # Convert list to string for CSV
             'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
         }
         
@@ -80,25 +79,26 @@ if __name__ == "__main__":
 
         # Optionally print to the console (as in your original code)
         print(f"Agent #{a.id}")
-        print(f"Scalarized: {scalarized}")
-        print(f"Vectorial: {reward}")
+        #print(f"Scalarized: {scalarized}")
+        print(f"Vectorial: {e}")
         print(f"Weights: {a.np_weights}")
 
         # Store the reward vector
-        all_rewards.append(reward)
+        all_rewards.append(e)
 
-    # Convert the list of agent data into a DataFrame
-    df = pd.DataFrame(agent_data)
+    if SAVE:
+        # Convert the list of agent data into a DataFrame
+        df = pd.DataFrame(agent_data)
 
-    # Save the DataFrame to an Excel file
-    output_file = 'agent_performance.csv'
-    # Check if file exists to avoid writing headers again
-    file_exists = os.path.isfile(output_file)
+        # Save the DataFrame to an Excel file
+        output_file = 'agent_performance.csv'
+        # Check if file exists to avoid writing headers again
+        file_exists = os.path.isfile(output_file)
 
-    # Append data to CSV (without writing headers if the file already exists)
-    df.to_csv(output_file, mode='a', index=False, header=not file_exists)
+        # Append data to CSV (without writing headers if the file already exists)
+        df.to_csv(output_file, mode='a', index=False, header=not file_exists)
 
-    print(f"Data has been written to {output_file}")
+        print(f"Data has been written to {output_file}")
 
     # Convert to NumPy array for easy slicing
     all_rewards = np.array(all_rewards)
