@@ -11,9 +11,11 @@ import morl_baselines as mb
 from gymnasium.envs.registration import register
 from igmorl import IGMORL, make_env
 from config import *
+from e_nautilus import E_NAUTILUS
 
 SEED = 42
 SAVE = False
+E_NAUT = True
 
 # Register the custom environment
 register(
@@ -116,4 +118,13 @@ if __name__ == "__main__":
 
     # Show plot
     plt.show()
+
+    if E_NAUT:
+        e_nautilus = E_NAUTILUS(all_rewards)
+
+        # Run the interactive method
+        selected_solution = e_nautilus.run()
+
+        print("Final Selected Solution:", selected_solution)
+
     
