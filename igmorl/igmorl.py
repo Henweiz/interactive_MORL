@@ -17,6 +17,7 @@ import torch as th
 import wandb
 from scipy.optimize import least_squares
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from morl_baselines.common.evaluation import log_all_multi_policy_metrics
 from morl_baselines.common.morl_algorithm import MOAgent
@@ -357,6 +358,7 @@ class IGMORL(MOAgent):
         gae_lambda: float = 0.95,
         device: Union[th.device, str] = "auto",
         group: Optional[str] = None,
+        target: np.ndarray = np.array([0.0, 0.0]),
         interactive: bool = True,
     ):
         """Initializes the PGMORL agent.
@@ -409,6 +411,7 @@ class IGMORL(MOAgent):
         self.tmp_env.close()
         self.gamma = gamma
         self.bounds = origin
+        self.target = target
 
         # EA parameters
         self.pop_size = pop_size
@@ -677,6 +680,8 @@ class IGMORL(MOAgent):
         max_iterations = total_timesteps // self.steps_per_iteration // self.num_envs // self.pop_size
         iteration = 0
 
+        pareto_front_history = []
+
         # Initialize progress bar
         self.global_step = 0  # Ensure it starts at 0
         with tqdm(total=total_timesteps, desc="Training Progress", unit="steps") as pbar:
@@ -747,8 +752,13 @@ class IGMORL(MOAgent):
                     known_pareto_front=known_pareto_front,
                 )
                 evolutionary_generation += 1
+                pareto_front_history.append({
+                    'iteration': iteration,
+                    'global_step': self.global_step,
+                    'pareto_front': deepcopy(self.archive.evaluations)
+                })
 
-                if self.interactive:
+                if self.interactive and iteration < max_iterations:
                     self.selected_agent = self.user_select()
                     print(f"New lower bounds: {self.bounds}")
 
@@ -756,76 +766,88 @@ class IGMORL(MOAgent):
         self.env.close()
         if self.log:
             self.close_wandb()
+        return pareto_front_history
 
     def user_select(self):
-        """User selection of their preferred policy based on the current pareto front."""
-        individuals_by_id = {}
-
+        """User selection of their preferred policy based on the current Pareto front with reselection support."""
         if len(self.archive.individuals) < 2:
             print("Not enough individuals in the archive to select from.")
             return
+
         print("\nCurrent Pareto Front:")
-        
+        pareto_points = []
+        agent_data_list = []  # Store all agents and their evaluations
+
         for a, evaluation in zip(self.archive.individuals, self.archive.evaluations):
             scalarized = np.dot(evaluation, np.array([1.0, 1.0]))
-            #discounted_scalarized = np.dot(evaluation, a.np_weights)
-            agent_id = int(a.id)
             print(f"\nAgent #{a.id}")
             print(f"Scalarized: {scalarized}")
-            #print(f"Discounted scalarized: {discounted_scalarized}")
             print(f"Vectorial: {evaluation}")
+            print(f"Distance to Target Point: {np.linalg.norm(evaluation - self.target) }")
             print(f"Current Weights: {a.np_weights}")
 
-            # Store the individual by id, allowing multiple entries per id
-            if agent_id not in individuals_by_id:
-                individuals_by_id[agent_id] = []
-            individuals_by_id[agent_id].append((a, evaluation))
+            # Store the agent and its evaluation
+            agent_data_list.append((a, evaluation))
+            pareto_points.append(evaluation)
 
-        # Allow the user to select an individual
-        while True:
-            try:
-                selected_id = input("\nEnter the preferred Agent ID to continue: ").strip()
-                
-                # Convert ID to the expected type (assuming int, change if necessary)
-                selected_id = int(selected_id)
+        pareto_points = np.array(pareto_points)
 
-                if selected_id in individuals_by_id:
-                    agent_data = individuals_by_id[selected_id]  # List of tuples (agent, evaluation)
-    
-                    individuals = [x[0] for x in agent_data]  # Extract agents
-                    evaluations = [x[1] for x in agent_data]  # Extract evaluations
-                    idx = 0
+        # Interactive plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        scatter = ax.scatter(pareto_points[:, 0], pareto_points[:, 1], color='blue', picker=True)  # Set all points to blue
+        ax.set_xlabel("Objective 1")
+        ax.set_ylabel("Objective 2")
+        ax.set_title("Interactive Pareto Front Selection")
+        selected_point_marker = None  # Marker for the selected point
 
-                    # If multiple agents share the same ID, let the user pick one
-                    if len(individuals) > 1:
-                        print(f"\nMultiple agents found with ID {selected_id}:")
-                        for i, ind in enumerate(individuals):
-                            print(f"[{i}] evaluation: {evaluations[i]}")
+        selected_agent = None
 
-                        idx = int(input("\nSelect index of the preferred agent: ").strip())
-                        selected_agent = individuals[idx]
-                    else:
-                        selected_agent = individuals[idx]
+        def on_click(event):
+            nonlocal selected_agent, selected_point_marker
+            if event.inaxes != ax:
+                return
 
-                    print("\nSelected Agent Details:")
-                    print(f"ID: {selected_agent.id}")
-                    print(f"Weights: {selected_agent.np_weights}")
-                    print(f"Evaluation: {evaluations[idx]}")
-                    self.bounds = evaluations[idx] * 1.3 # Update the limits with a small delta value
-                    # Assigns best predicted (weight-agent) pair to the worker
-                    #copied_agent = deepcopy(best_candidate[0])
-                    #copied_agent.global_step = self.agents[i].global_step
-                    #copied_agent.id = i
-                    #copied_agent.change_weights(deepcopy(best_candidate[1]))
-                    #self.agents[i] = copied_agent
-                    return [selected_agent, evaluations[idx]]
-                else:
-                    print("Invalid ID. Please enter a valid Agent ID.")
+            # Get the clicked coordinates
+            clicked_x, clicked_y = event.xdata, event.ydata
+            print(f"Clicked at: ({clicked_x}, {clicked_y})")
 
-            except ValueError:
-                print("Invalid input. Please enter a valid number.")
-            except IndexError:
-                print("Invalid index. Please select a valid agent from the list.")
+            # Find the closest point in the Pareto front
+            distances = np.linalg.norm(pareto_points - np.array([clicked_x, clicked_y]), axis=1)
+            closest_index = np.argmin(distances)
+            closest_point = pareto_points[closest_index]
+
+            # Retrieve the selected agent and evaluation
+            selected_agent, selected_evaluation = agent_data_list[closest_index]
+
+            print(f"Selected Agent ID: {selected_agent.id}")
+            print(f"Closest Point: {closest_point}")
+
+            # Update the bounds
+            self.bounds = selected_evaluation #* 1.1  # Update the bounds with a small delta
+
+            # Update the plot to highlight the selected point
+            if selected_point_marker:
+                selected_point_marker.remove()  # Remove the previous marker
+            selected_point_marker = ax.scatter(
+                closest_point[0], closest_point[1], color='red', s=100, label="Selected Point"
+            )
+            ax.legend()
+            plt.draw()  # Update the plot to show the highlighted point
+
+        # Connect the click event to the on_click function
+        fig.canvas.mpl_connect('button_press_event', on_click)
+
+        plt.show()
+
+        if selected_agent is not None:
+            print("\nSelected Agent Details:")
+            print(f"ID: {selected_agent.id}")
+            print(f"Weights: {selected_agent.np_weights}")
+            print(f"Evaluation: {self.bounds / 1.1}")  # Reverse the scaling to show the original evaluation
+            return [selected_agent, self.bounds / 1.1]
+        else:
+            print("No agent selected.")
+            return None
 
 
 def make_env(env_id, seed, idx, run_name, gamma):

@@ -7,6 +7,22 @@ config_1 = {
     'num_envs': 4,
     'pop_size': 7,
     'warmup_iterations': 10,
+    'evolutionary_iterations': 10,
+    'num_weight_candidates': 50,
+    'origin': np.array([-110, -110]),
+    'steps_per_iteration': 1000,
+    'delta_weight': 0.2,
+    'total_timesteps': 2500000,
+    'gamma': 0.995
+}
+
+config_2 = {
+    'env_id': "mo-mountaincarcontinuous-v0",
+    'seed': 42,
+    'ref_point': np.array([-110, -110]),
+    'num_envs': 4,
+    'pop_size': 7,
+    'warmup_iterations': 5,
     'evolutionary_iterations': 5,
     'num_weight_candidates': 50,
     'origin': np.array([-110, -110]),
@@ -28,7 +44,7 @@ config_test = {
     'origin': np.array([-110, -110]),
     'steps_per_iteration': 100,
     'delta_weight': 0.2,
-    'total_timesteps': 1000,
+    'total_timesteps': 5000,
     'gamma': 0.995
 }
 
@@ -38,5 +54,7 @@ def load_config(config_name):
         return config_1
     elif config_name == "config_test":
         return config_test
+    elif config_name == "config_2":
+        return config_2
     else:
         raise ValueError(f"Unknown configuration: {config_name}")
