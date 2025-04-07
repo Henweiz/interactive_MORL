@@ -29,6 +29,10 @@ interactive_2 = df[df['type'] == 'interactive_2']
 plt.scatter(interactive_2['x'], interactive_2['y'], 
            color='cyan', label='Interactive-Low', alpha=0.7, s=100)
 
+interactive_2_no_delta = df[df['type'] == 'interactive_2_no_delta']
+plt.scatter(interactive_2_no_delta['x'], interactive_2_no_delta['y'], 
+           color='green', label='Interactive-Low-no-delta', alpha=0.7, s=100)
+
 # Add labels and title
 plt.xlabel('X Component', fontsize=12)
 plt.ylabel('Y Component', fontsize=12)

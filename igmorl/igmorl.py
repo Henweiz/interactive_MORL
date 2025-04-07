@@ -843,8 +843,8 @@ class IGMORL(MOAgent):
             print("\nSelected Agent Details:")
             print(f"ID: {selected_agent.id}")
             print(f"Weights: {selected_agent.np_weights}")
-            print(f"Evaluation: {self.bounds / 1.1}")  # Reverse the scaling to show the original evaluation
-            return [selected_agent, self.bounds / 1.1]
+            print(f"Evaluation: {self.bounds}")  # Reverse the scaling to show the original evaluation
+            return [selected_agent, self.bounds]
         else:
             print("No agent selected.")
             return None
