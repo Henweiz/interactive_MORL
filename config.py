@@ -32,6 +32,23 @@ config_2 = {
     'gamma': 0.995
 }
 
+
+config_cheetah = {
+    'env_id': "mo-halfcheetah-v5",
+    'seed': 42,
+    'ref_point': np.array([-100, -100]),
+    'num_envs': 4,
+    'pop_size': 6,
+    'warmup_iterations': 40,
+    'evolutionary_iterations': 20,
+    'num_weight_candidates': 50,
+    'origin': np.array([-100, -100]),
+    'delta_weight': 0.2,
+    'steps_per_iteration': 400,
+    'total_timesteps': 2000000,
+    'gamma': 0.99
+}
+
 config_test = {
     'env_id': "mo-mountaincarcontinuous-v0",
     'seed': 42,
@@ -56,5 +73,7 @@ def load_config(config_name):
         return config_test
     elif config_name == "config_2":
         return config_2
+    elif config_name == "config_cheetah":
+        return config_cheetah
     else:
         raise ValueError(f"Unknown configuration: {config_name}")

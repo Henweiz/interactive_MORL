@@ -19,8 +19,8 @@ SAVE = True
 E_NAUT = False
 LOG = False
 INTERACTIVE = True
-EXPERIMENT = "interactive_2_no_delta"  # Change to "interactive" for interactive agents
-CONFIG = "config_2"  # Change to "config_test" for testing
+EXPERIMENT = "interactive"  # Change to "interactive" for interactive agents
+CONFIG = "config_cheetah"  # Change to "config_test" for testing
 
 # Register the custom environment
 register(
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         log=LOG,
         seed=config['seed'],
         interactive=INTERACTIVE,
-        target=np.array([-0.8, -0.8])  # Target for the interactive agents
+        target=np.array([6, -2])  # Target for the interactive agents
     )
 
     # Train the algorithm using parameters from the selected configuration

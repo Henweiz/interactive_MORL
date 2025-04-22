@@ -823,7 +823,7 @@ class IGMORL(MOAgent):
             print(f"Closest Point: {closest_point}")
 
             # Update the bounds
-            self.bounds = selected_evaluation #* 1.1  # Update the bounds with a small delta
+            self.bounds = selected_evaluation * 1.1  # Update the bounds with a small delta
 
             # Update the plot to highlight the selected point
             if selected_point_marker:
