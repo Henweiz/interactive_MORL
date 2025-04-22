@@ -2,36 +2,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Read the data from CSV file
-df = pd.read_csv('agent_performance.csv', header=None, names=['type', 'agent_id', 'vectorial', 'weights'])
+df = pd.read_csv('agent_performance.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights'])
 
 # Remove square brackets and split the vectorial column into x and y components
-df['vectorial'] = df['vectorial'].str.strip("[]")  # Remove square brackets
-df[['x', 'y']] = df['vectorial'].str.split(';', expand=True).astype(float)
+df['Vectorial Reward'] = df['Vectorial Reward'].str.strip("[]")  # Remove square brackets
+df[['x', 'y']] = df['Vectorial Reward'].str.split(';', expand=True).astype(float)
+
+# Define a color map for the different types
+colors = ['blue', 'red', 'pink', 'cyan', 'green', 'yellow', 'orange', 'purple']
+color_map = {type_name: colors[i % len(colors)] for i, type_name in enumerate(df['type'].unique())}
 
 # Create the plot
 plt.figure(figsize=(12, 7))
 
-# Plot interactive points (blue)
-interactive = df[df['type'] == 'interactive']
-plt.scatter(interactive['x'], interactive['y'], 
-           color='blue', label='Interactive 1', alpha=0.7, s=100)
-
-# Plot non-interactive points (red)
-non_interactive = df[df['type'] == 'no_interactive']
-plt.scatter(non_interactive['x'], non_interactive['y'], 
-           color='red', label='Non-Interactive', alpha=0.7, s=100)
-
-non_interactive_2 = df[df['type'] == 'no_interactive_2']
-plt.scatter(non_interactive_2['x'], non_interactive_2['y'], 
-           color='pink', label='Non-Interactive-Low', alpha=0.7, s=100)
-
-interactive_2 = df[df['type'] == 'interactive_2']
-plt.scatter(interactive_2['x'], interactive_2['y'], 
-           color='cyan', label='Interactive-Low', alpha=0.7, s=100)
-
-interactive_2_no_delta = df[df['type'] == 'interactive_2_no_delta']
-plt.scatter(interactive_2_no_delta['x'], interactive_2_no_delta['y'], 
-           color='green', label='Interactive-Low-no-delta', alpha=0.7, s=100)
+# Loop through each unique type and plot
+for type_name, color in color_map.items():
+    subset = df[df['type'] == type_name]
+    plt.scatter(subset['x'], subset['y'], color=color, label=type_name, alpha=0.7, s=100)
 
 # Add labels and title
 plt.xlabel('X Component', fontsize=12)
