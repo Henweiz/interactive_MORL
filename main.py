@@ -20,9 +20,10 @@ SEED = 42
 SAVE = False
 E_NAUT = False
 LOG = False
-INTERACTIVE = False
+INTERACTIVE = True
+ARTIFICIAL = True  # Set to True for artificial user selection, interactive needs to be "True" as well
 EXPERIMENT = "no_interactive"  # Change to "interactive" for interactive agents
-CONFIG = "config_nile"  # Change to "config_test" for testing
+CONFIG = "config_1"  # Change to "config_test" for testing
 OUTPUT = 'nile_agent_performance.csv'
 
 # Register the custom environment
@@ -39,6 +40,9 @@ register(
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+
+def user_utility(a, b):
+    return a * 0.3 + b * 0.7
 
 def plot_pareto_progression(history, show=True, save_path="pareto_front_evolution.mp4"):
     """Visualizes how the Pareto front evolved during training and saves it as a video.
@@ -176,6 +180,8 @@ if __name__ == "__main__":
         log=LOG,
         seed=config['seed'],
         interactive=INTERACTIVE,
+        artificial=ARTIFICIAL,
+        user_utility=user_utility,
         target=np.array([6, -2])  # Target for the interactive agents
     )
 

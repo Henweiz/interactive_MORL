@@ -49,3 +49,35 @@ def interactive_plot(pareto_points, agents=None):
 
         plt.show()
         return selected_agent, selected_evaluation
+
+def artifical_user_selection(function, pareto_points, agents):
+    """
+    Simulates a user selection of points from the Pareto front.
+    
+    Parameters:
+    - function: The function to be called for each selected point.
+    - pareto_points: The Pareto front points to select from.
+    - agents: Optional. The agents corresponding to the Pareto points.
+    
+    Returns:
+    - selected_agents: List of selected agents.
+    - selected_evaluations: List of selected evaluations.
+    """
+    assert len(pareto_points) > 0, "Pareto points cannot be empty."
+    assert len(pareto_points) == len(agents), "Number of Pareto points must match number of agents."
+    assert function 
+
+    selected_agent = None
+    selected_evaluation = None
+    max_val = -np.inf
+
+    for i in range(len(pareto_points)):
+        val = function(pareto_points[i,0], pareto_points[i,1])
+        if val >= max_val:
+            max_val = val
+            selected_agent = agents[i]
+            selected_evaluation = pareto_points[i]
+
+    print(f"User utility value: {max_val}")
+
+    return selected_agent, selected_evaluation

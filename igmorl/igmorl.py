@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
 import time
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Callable
 from typing_extensions import override
 
 import gymnasium as gym
@@ -312,6 +312,8 @@ class PerformanceBuffer:
                     break
 
 
+
+
 class IGMORL(MOAgent):
     """Prediction Guided Multi-Objective Reinforcement Learning.
 
@@ -364,6 +366,8 @@ class IGMORL(MOAgent):
         group: Optional[str] = None,
         target: np.ndarray = np.array([0.0, 0.0]),
         interactive: bool = True,
+        artificial: bool = False,
+        user_utility: Callable[[float, float], float] = None,  # Accept a callable function
     ):
         """Initializes the PGMORL agent.
 
@@ -406,6 +410,7 @@ class IGMORL(MOAgent):
             group: The wandb group to use for logging.
         """
         super().__init__(env, device=device, seed=seed)
+        self.user_utility = user_utility  # Store the function as an instance variable
         # Env dimensions
         self.tmp_env = mo_gym.make(env_id)
         self.extract_env_info(self.tmp_env)
@@ -454,6 +459,7 @@ class IGMORL(MOAgent):
         self.gae_lambda = gae_lambda
         self.gae = gae
         self.interactive = interactive
+        self.artificial = artificial
         self.selected_agent = [None, None]
 
         # env setup
@@ -614,7 +620,7 @@ class IGMORL(MOAgent):
                     for weight in candidate_weights
                     if (tuple(last_candidate_eval), tuple(weight)) not in selected_tasks
                 ]
-                print(candidate_tuples)
+                #print(candidate_tuples)
 
                 # Prediction of improvements of each pair
                 delta_predictions, predicted_evals = map(
@@ -788,7 +794,6 @@ class IGMORL(MOAgent):
             print(f"\nAgent #{a.id}")
             print(f"Scalarized: {scalarized}")
             print(f"Vectorial: {evaluation}")
-            print(f"Distance to Target Point: {np.linalg.norm(evaluation - self.target) }")
             print(f"Current Weights: {a.np_weights}")
 
             # Store the agent and its evaluation
@@ -796,8 +801,10 @@ class IGMORL(MOAgent):
             pareto_points.append(evaluation)
 
         pareto_points = np.array(pareto_points)
-
-        selected_agent, selected_evaluation = utils.interactive_plot(pareto_points, agents)
+        if self.artificial:
+            selected_agent, selected_evaluation = utils.artifical_user_selection(self.user_utility, pareto_points, agents)
+        else:
+            selected_agent, selected_evaluation = utils.interactive_plot(pareto_points, agents)
 
         if selected_agent is not None:
             self.bounds = selected_evaluation * 1.1  # Update the bounds with a small delta
