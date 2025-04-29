@@ -4,10 +4,6 @@ Some code in this file has been adapted from the original code provided by the a
 (!) Limited to 2 objectives for now.
 (!) The post-processing phase has not been implemented yet.
 """
-import os
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
 import time
 from copy import deepcopy
 from typing import List, Optional, Tuple, Union
@@ -19,15 +15,12 @@ import numpy as np
 import torch as th
 import wandb
 from scipy.optimize import least_squares
-from tqdm import tqdm
-import matplotlib.pyplot as plt
 
 from morl_baselines.common.evaluation import log_all_multi_policy_metrics
 from morl_baselines.common.morl_algorithm import MOAgent
 from morl_baselines.common.pareto import ParetoArchive
 from morl_baselines.common.performance_indicators import hypervolume, sparsity
 from morl_baselines.single_policy.ser.mo_ppo import MOPPO, MOPPONet, make_env
-from gymnasium.wrappers.common import RecordEpisodeStatistics
 
 
 class PerformancePredictor:
@@ -177,8 +170,8 @@ class PerformancePredictor:
             current_sigma *= 2.0
             current_neighb_threshold *= 2.0
 
-            #print(f"current_neighb_threshold: {current_neighb_threshold}")
-            #print(f"np.abs(policy_eval): {np.abs(policy_eval)}")
+            print(f"current_neighb_threshold: {current_neighb_threshold}")
+            print(f"np.abs(policy_eval): {np.abs(policy_eval)}")
             if current_neighb_threshold == np.inf or current_sigma == np.inf:
                 raise ValueError("Cannot find at least 4 neighbors by enlarging the neighborhood.")
 
@@ -208,27 +201,15 @@ class PerformancePredictor:
         return delta_predictions, delta_predictions + policy_eval
 
 
-import numpy as np
-
 def generate_weights(delta_weight: float) -> np.ndarray:
     """Generates weights uniformly distributed over the objective dimensions. These weight vectors are separated by delta_weight distance.
-    
-    Ensures that [0.5, 0.5] is included in the generated weights.
 
     Args:
-        delta_weight: Distance between weight vectors.
-
+        delta_weight: distance between weight vectors
     Returns:
-        A numpy array of candidate weights.
+        all the candidate weights
     """
-    weights = np.linspace((0.0, 1.0), (1.0, 0.0), int(1 / delta_weight) + 1, dtype=np.float32)
-
-    # Check if [0.5, 0.5] is already in the array
-    target_weight = np.array([0.5, 0.5], dtype=np.float32)
-    if not np.any(np.all(np.isclose(weights, target_weight), axis=1)):
-        weights = np.vstack([weights, target_weight])  # Add [0.5, 0.5] if missing
-
-    return weights
+    return np.linspace((0.0, 1.0), (1.0, 0.0), int(1 / delta_weight) + 1, dtype=np.float32)
 
 
 class PerformanceBuffer:
@@ -262,22 +243,6 @@ class PerformanceBuffer:
     def individuals(self) -> list:
         """Returns the individuals in the buffer."""
         return [i for l in self.bins for i in l]
-    
-    def filtered_evaluations(self, bounds) -> List[np.ndarray]:
-        """Returns evaluations of valid individuals (filtered)."""
-        return [e for e in self.evaluations if np.all(e >= bounds)]
-
-
-    def filtered_individuals(self, bounds) -> list:
-        """Returns valid individuals (filtered)."""
-        filtered = []
-        for bin_individuals, bin_evals in zip(self.bins, self.bins_evals):
-            for ind, eval in zip(bin_individuals, bin_evals):
-                if np.all(eval >= bounds):
-                    filtered.append(ind)
-        return filtered
-
-
 
     def add(self, candidate, evaluation: np.ndarray):
         """Adds a candidate to the buffer.
@@ -311,7 +276,7 @@ class PerformanceBuffer:
                     break
 
 
-class IGMORL(MOAgent):
+class PGMORL(MOAgent):
     """Prediction Guided Multi-Objective Reinforcement Learning.
 
     Reference: J. Xu, Y. Tian, P. Ma, D. Rus, S. Sueda, and W. Matusik,
@@ -361,8 +326,6 @@ class IGMORL(MOAgent):
         gae_lambda: float = 0.95,
         device: Union[th.device, str] = "auto",
         group: Optional[str] = None,
-        target: np.ndarray = np.array([0.0, 0.0]),
-        interactive: bool = True,
     ):
         """Initializes the PGMORL agent.
 
@@ -413,8 +376,6 @@ class IGMORL(MOAgent):
         assert isinstance(self.action_space, gym.spaces.Box), "only continuous action space is supported"
         self.tmp_env.close()
         self.gamma = gamma
-        self.bounds = origin
-        self.target = target
 
         # EA parameters
         self.pop_size = pop_size
@@ -452,16 +413,14 @@ class IGMORL(MOAgent):
         self.clip_vloss = clip_vloss
         self.gae_lambda = gae_lambda
         self.gae = gae
-        self.interactive = interactive
-        self.selected_agent = [None, None]
 
         # env setup
         if env is None:
             if self.seed is not None:
                 envs = [make_env(env_id, self.seed + i, i, experiment_name, self.gamma) for i in range(self.num_envs)]
             else:
-                envs = [make_env(env_id, i, i+1, experiment_name, self.gamma) for i in range(self.num_envs)]
-            self.env = mo_gym.wrappers.vector.MOSyncVectorEnv(envs)
+                envs = [make_env(env_id, i, i, experiment_name, self.gamma) for i in range(self.num_envs)]
+            self.env = mo_gym.MOSyncVectorEnv(envs)
         else:
             raise ValueError("Environments should be vectorized for PPO. You should provide an environment id instead.")
 
@@ -547,9 +506,7 @@ class IGMORL(MOAgent):
 
     def __train_all_agents(self, iteration: int, max_iterations: int):
         for i, agent in enumerate(self.agents):
-            agent.global_step = self.global_step
             agent.train(self.start_time, iteration, max_iterations)
-            self.global_step += self.steps_per_iteration * self.num_envs
 
     def __eval_all_agents(
         self,
@@ -561,7 +518,7 @@ class IGMORL(MOAgent):
     ):
         """Evaluates all agents and store their current performances on the buffer and pareto archive."""
         for i, agent in enumerate(self.agents):
-            _, _, reward, discounted_reward = agent.policy_eval(eval_env, weights=agent.np_weights, log=self.log)
+            _, _, _, discounted_reward = agent.policy_eval(eval_env, weights=agent.np_weights, log=self.log)
             # Storing current results
             self.population.add(agent, discounted_reward)
             self.archive.add(agent, discounted_reward)
@@ -591,14 +548,10 @@ class IGMORL(MOAgent):
         self.np_random.shuffle(candidate_weights)  # Randomize
 
         current_front = deepcopy(self.archive.evaluations)
-        population = self.population.filtered_individuals(self.bounds)
-        population_eval = self.population.filtered_evaluations(self.bounds)
+        population = self.population.individuals
+        population_eval = self.population.evaluations
         selected_tasks = []
         # For each worker, select a (policy, weight) tuple
-        if len(population) == 0:
-            population.append(self.selected_agent[0])
-            population_eval.append(self.selected_agent[1])
-            
         for i in range(len(self.agents)):
             max_improv = float("-inf")
             best_candidate = None
@@ -613,7 +566,6 @@ class IGMORL(MOAgent):
                     for weight in candidate_weights
                     if (tuple(last_candidate_eval), tuple(weight)) not in selected_tasks
                 ]
-                print(candidate_tuples)
 
                 # Prediction of improvements of each pair
                 delta_predictions, predicted_evals = map(
@@ -647,7 +599,7 @@ class IGMORL(MOAgent):
             selected_tasks.append((tuple(best_eval), tuple(best_candidate[1])))
             # Append current estimate to the estimated front (to compute the next predictions)
             current_front.append(best_predicted_eval)
-            
+
             # Assigns best predicted (weight-agent) pair to the worker
             copied_agent = deepcopy(best_candidate[0])
             copied_agent.global_step = self.agents[i].global_step
@@ -660,7 +612,6 @@ class IGMORL(MOAgent):
                 f"current eval: {best_eval} - estimated next: {best_predicted_eval} - deltas {(best_predicted_eval - best_eval)}"
             )
 
-    
     def train(
         self,
         total_timesteps: int,
@@ -680,253 +631,66 @@ class IGMORL(MOAgent):
                 }
             )
         self.num_eval_weights_for_eval = num_eval_weights_for_eval
-
-        max_iterations = total_timesteps // self.steps_per_iteration // self.num_envs // self.pop_size
+        max_iterations = total_timesteps // self.steps_per_iteration // self.num_envs
         iteration = 0
+        # Init
+        current_evaluations = [np.zeros(self.reward_dim) for _ in range(len(self.agents))]
+        self.__eval_all_agents(
+            eval_env=eval_env,
+            evaluations_before_train=current_evaluations,
+            ref_point=ref_point,
+            known_pareto_front=known_pareto_front,
+            add_to_prediction=False,
+        )
+        self.start_time = time.time()
 
-        pareto_front_history = []
+        # Warmup
+        for i in range(1, self.warmup_iterations + 1):
+            print(f"Warmup iteration #{iteration}")
+            if self.log:
+                wandb.log({"charts/warmup_iterations": i, "global_step": self.global_step})
+            self.__train_all_agents(iteration=iteration, max_iterations=max_iterations)
+            iteration += 1
+        self.__eval_all_agents(
+            eval_env=eval_env,
+            evaluations_before_train=current_evaluations,
+            ref_point=ref_point,
+            known_pareto_front=known_pareto_front,
+        )
 
-        # Initialize progress bar
-        self.global_step = 0  # Ensure it starts at 0
-        with tqdm(total=total_timesteps, desc="Training Progress", unit="steps") as pbar:
-
-            # Init
-            current_evaluations = [np.zeros(self.reward_dim) for _ in range(len(self.agents))]
-            self.__eval_all_agents(
-                eval_env=eval_env,
-                evaluations_before_train=current_evaluations,
-                ref_point=ref_point,
-                known_pareto_front=known_pareto_front,
-                add_to_prediction=False,
-            )
-            self.start_time = time.time()
-
-            # Warmup Phase
-            for i in range(1, self.warmup_iterations + 1):
-                print(f"Warmup iteration #{iteration}, global step: {self.global_step}")
-                if self.log:
-                    wandb.log({"charts/warmup_iterations": i, "global_step": self.global_step})
-                
-                self.__train_all_agents(iteration=iteration, max_iterations=max_iterations)
-
-                # Update progress bar with the number of timesteps per iteration
-                pbar.update(self.steps_per_iteration * self.num_envs * self.pop_size)
-                iteration += 1
-
-            self.__eval_all_agents(
-                eval_env=eval_env,
-                evaluations_before_train=current_evaluations,
-                ref_point=ref_point,
-                known_pareto_front=known_pareto_front,
-            )
-
-            # Evolution Phase
-            max_iterations = max(max_iterations, self.warmup_iterations + self.evolutionary_iterations)
-            evolutionary_generation = 1
-
-            while iteration < max_iterations:
-                self.__task_weight_selection(ref_point=ref_point)
-                print(f"Evolutionary generation #{evolutionary_generation}")
-
-                if self.log:
-                    wandb.log(
-                        {"charts/evolutionary_generation": evolutionary_generation, "global_step": self.global_step},
-                    )
-
-                for _ in range(self.evolutionary_iterations):
-                    if self.log:
-                        print(f"Evolutionary iteration #{iteration - self.warmup_iterations}")
-                        wandb.log(
-                            {
-                                "charts/evolutionary_iterations": iteration - self.warmup_iterations,
-                                "global_step": self.global_step,
-                            },
-                        )
-
-                    self.__train_all_agents(iteration=iteration, max_iterations=max_iterations)
-
-                    # Update progress bar with the number of timesteps per iteration
-                    pbar.update(self.steps_per_iteration * self.num_envs * self.pop_size)
-                    iteration += 1
-
-                self.__eval_all_agents(
-                    eval_env=eval_env,
-                    evaluations_before_train=current_evaluations,
-                    ref_point=ref_point,
-                    known_pareto_front=known_pareto_front,
+        # Evolution
+        max_iterations = max(max_iterations, self.warmup_iterations + self.evolutionary_iterations)
+        evolutionary_generation = 1
+        while iteration < max_iterations:
+            # Every evolutionary iterations, change the task - weight assignments
+            self.__task_weight_selection(ref_point=ref_point)
+            print(f"Evolutionary generation #{evolutionary_generation}")
+            if self.log:
+                wandb.log(
+                    {"charts/evolutionary_generation": evolutionary_generation, "global_step": self.global_step},
                 )
-                evolutionary_generation += 1
-                pareto_front_history.append({
-                    'iteration': iteration,
-                    'global_step': self.global_step,
-                    'pareto_front': deepcopy(self.archive.evaluations)
-                })
 
-                if self.interactive and iteration < max_iterations:
-                    self.selected_agent = self.user_select()
-                    print(f"New lower bounds: {self.bounds}")
+            for _ in range(self.evolutionary_iterations):
+                # Run training of every agent for evolutionary iterations.
+                if self.log:
+                    print(f"Evolutionary iteration #{iteration - self.warmup_iterations}")
+                    wandb.log(
+                        {
+                            "charts/evolutionary_iterations": iteration - self.warmup_iterations,
+                            "global_step": self.global_step,
+                        },
+                    )
+                self.__train_all_agents(iteration=iteration, max_iterations=max_iterations)
+                iteration += 1
+            self.__eval_all_agents(
+                eval_env=eval_env,
+                evaluations_before_train=current_evaluations,
+                ref_point=ref_point,
+                known_pareto_front=known_pareto_front,
+            )
+            evolutionary_generation += 1
 
         print("Done training!")
         self.env.close()
         if self.log:
             self.close_wandb()
-        return pareto_front_history
-
-    def user_select(self):
-        """User selection of their preferred policy based on the current Pareto front with reselection support."""
-        if len(self.archive.individuals) < 2:
-            print("Not enough individuals in the archive to select from.")
-            return
-
-        print("\nCurrent Pareto Front:")
-        pareto_points = []
-        agent_data_list = []  # Store all agents and their evaluations
-
-        for a, evaluation in zip(self.archive.individuals, self.archive.evaluations):
-            scalarized = np.dot(evaluation, np.array([1.0, 1.0]))
-            print(f"\nAgent #{a.id}")
-            print(f"Scalarized: {scalarized}")
-            print(f"Vectorial: {evaluation}")
-            print(f"Distance to Target Point: {np.linalg.norm(evaluation - self.target) }")
-            print(f"Current Weights: {a.np_weights}")
-
-            # Store the agent and its evaluation
-            agent_data_list.append((a, evaluation))
-            pareto_points.append(evaluation)
-
-        pareto_points = np.array(pareto_points)
-
-        # Interactive plot
-        fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(pareto_points[:, 0], pareto_points[:, 1], color='blue', picker=True)  # Set all points to blue
-        ax.set_xlabel("Objective 1")
-        ax.set_ylabel("Objective 2")
-        ax.set_title("Interactive Pareto Front Selection")
-        selected_point_marker = None  # Marker for the selected point
-
-        selected_agent = None
-
-        def on_click(event):
-            nonlocal selected_agent, selected_point_marker
-            if event.inaxes != ax:
-                return
-
-            # Get the clicked coordinates
-            clicked_x, clicked_y = event.xdata, event.ydata
-            print(f"Clicked at: ({clicked_x}, {clicked_y})")
-
-            # Find the closest point in the Pareto front
-            distances = np.linalg.norm(pareto_points - np.array([clicked_x, clicked_y]), axis=1)
-            closest_index = np.argmin(distances)
-            closest_point = pareto_points[closest_index]
-
-            # Retrieve the selected agent and evaluation
-            selected_agent, selected_evaluation = agent_data_list[closest_index]
-
-            print(f"Selected Agent ID: {selected_agent.id}")
-            print(f"Closest Point: {closest_point}")
-
-            # Update the bounds
-            self.bounds = selected_evaluation * 1.1  # Update the bounds with a small delta
-
-            # Update the plot to highlight the selected point
-            if selected_point_marker:
-                selected_point_marker.remove()  # Remove the previous marker
-            selected_point_marker = ax.scatter(
-                closest_point[0], closest_point[1], color='red', s=100, label="Selected Point"
-            )
-            ax.legend()
-            plt.draw()  # Update the plot to show the highlighted point
-
-        # Connect the click event to the on_click function
-        fig.canvas.mpl_connect('button_press_event', on_click)
-
-        plt.show()
-
-        if selected_agent is not None:
-            print("\nSelected Agent Details:")
-            print(f"ID: {selected_agent.id}")
-            print(f"Weights: {selected_agent.np_weights}")
-            print(f"Evaluation: {self.bounds}")  # Reverse the scaling to show the original evaluation
-            return [selected_agent, self.bounds]
-        else:
-            print("No agent selected.")
-            return None
-
-
-def make_env(env_id, seed, idx, run_name, gamma):
-    """Returns a function to create environments. This is because PPO works better with vectorized environments. Also, some tricks like clipping and normalizing the environments' features are applied.
-
-    Args:
-        env_id: Environment ID (for MO-Gymnasium)
-        seed: Seed
-        idx: Index of the environment (-1 idx for human render)
-        run_name: Name of the run
-        gamma: Discount factor
-
-    Returns:
-        A function to create environments
-    """
-
-    def thunk():
-        if idx == -1:
-            env = mo_gym.make(env_id, render_mode="human")
-        else:
-            env = mo_gym.make(env_id)
-        reward_dim = env.unwrapped.reward_space.shape[0]
-        """ if idx == 0:
-            env = gym.wrappers.RecordVideo(
-                env,
-                f"videos/{run_name}_{seed}",
-                episode_trigger=lambda e: e % 1000 == 0,
-            ) """
-        env = gym.wrappers.ClipAction(env)
-        env = gym.wrappers.NormalizeObservation(env)
-        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), env.observation_space)
-        for o in range(reward_dim):
-            env = mo_gym.wrappers.MONormalizeReward(env, idx=o, gamma=gamma)
-            env = mo_gym.wrappers.MOClipReward(env, idx=o, min_r=-10, max_r=10)
-        env = MORecordEpisodeStatistics(env, gamma=gamma)
-        env.reset(seed=seed)
-        env.action_space.seed(seed)
-        env.observation_space.seed(seed)
-        return env
-
-    return thunk
-
-class MORecordEpisodeStatistics(RecordEpisodeStatistics, gym.utils.RecordConstructorArgs):
-    """This wrapper will keep track of cumulative rewards and episode lengths.
-
-    After the completion of an episode, ``info`` will look like this::
-
-        >>> info = {
-        ...     "episode": {
-        ...         "r": "<cumulative reward (array)>",
-        ...         "dr": "<discounted reward (array)>",
-        ...         "l": "<episode length (scalar)>",
-        ...         "t": "<elapsed time since beginning of episode (scalar)>"
-        ...     },
-        ... }
-    """
-
-    def __init__(
-        self,
-        env: gym.Env,
-        gamma: float = 1.0,
-        buffer_length: int = 100,
-        stats_key: str = "episode",
-    ):
-        """This wrapper will keep track of cumulative rewards and episode lengths.
-
-        Args:
-            env (Env): The environment to apply the wrapper
-            gamma (float): Discounting factor
-            buffer_length: The size of the buffers :attr:`return_queue`, :attr:`length_queue` and :attr:`time_queue`
-            stats_key: The info key for the episode statistics
-        """
-        gym.utils.RecordConstructorArgs.__init__(self, gamma=gamma, buffer_length=buffer_length, stats_key=stats_key)
-        RecordEpisodeStatistics.__init__(self, env, buffer_length=buffer_length, stats_key=stats_key)
-        # CHANGE: Here we just override the standard implementation to extend to MO
-        self.reward_dim = self.env.unwrapped.reward_space.shape[0]
-        self.rewards_shape = (self.reward_dim,)
-        self.gamma = gamma

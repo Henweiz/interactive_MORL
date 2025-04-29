@@ -1,13 +1,15 @@
 import os
+import sys
+from pathlib import Path
+
+# Add the parent directory of 'examples' to sys.path
+sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "examples"))
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import gymnasium as gym
-import mo_gymnasium as mo_gym
-import morl_baselines as mb
-#from morl_baselines.multi_policy.pgmorl.pgmorl import PGMORL
-#from morl_baselines.single_policy.ser.mo_ppo import make_env
-#from morl_baselines.common.evaluation import eval_mo
 from gymnasium.envs.registration import register
 from igmorl.igmorl import IGMORL, make_env
 from config import *
@@ -15,17 +17,24 @@ from igmorl.e_nautilus import E_NAUTILUS
 from matplotlib.animation import FuncAnimation
 
 SEED = 42
-SAVE = True
+SAVE = False
 E_NAUT = False
 LOG = False
-INTERACTIVE = True
-EXPERIMENT = "interactive"  # Change to "interactive" for interactive agents
-CONFIG = "config_cheetah"  # Change to "config_test" for testing
+INTERACTIVE = False
+EXPERIMENT = "no_interactive"  # Change to "interactive" for interactive agents
+CONFIG = "config_nile"  # Change to "config_test" for testing
+OUTPUT = 'nile_agent_performance.csv'
 
 # Register the custom environment
 register(
     id='dam-v0',
-    entry_point='env.dam:Dam',  
+    entry_point='env.water_dam.dam:Dam',  
+)
+
+register(
+    id='nile2-v0',
+    entry_point='env.wms_morl-main.examples.nile_river_simulation:create_nile_river_env',
+    kwargs={'custom_obj': ['ethiopia_power', 'egypt_deficit_minimised']}
 )
 
 import matplotlib.pyplot as plt
@@ -222,14 +231,13 @@ if __name__ == "__main__":
         df = pd.DataFrame(agent_data)
 
         # Save the DataFrame to an Excel file
-        output_file = 'agent_performance.csv'
         # Check if file exists to avoid writing headers again
-        file_exists = os.path.isfile(output_file)
+        file_exists = os.path.isfile(OUTPUT)
 
         # Append data to CSV (without writing headers if the file already exists)
-        df.to_csv(output_file, mode='a', index=False, header=not file_exists)
+        df.to_csv(OUTPUT, mode='a', index=False, header=not file_exists)
 
-        print(f"Data has been written to {output_file}")
+        print(f"Data has been written to {OUTPUT}")
 
     # Convert to NumPy array for easy slicing
     all_rewards = np.array(all_rewards)
