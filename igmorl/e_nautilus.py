@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster
 import matplotlib.pyplot as plt
+from igmorl.utils import interactive_plot  # Import the interactive plot function
 
 class E_NAUTILUS:
     def __init__(self, nd_solutions):
@@ -25,44 +26,39 @@ class E_NAUTILUS:
         iterations, n_points = self.initial_pref()
         z = self.nadir
         p = self.nd_solutions
-        print(p)
-        id = 0
 
         for h in range(iterations, 0, -1):
             if len(p) <= n_points:
                 print("Number of points is less than the number of clusters. Using all points.")
-                h = 1
                 break
-                
+
             clusters = self.cluster_front(n_points, p)
             z = self.generate_points(z, h, clusters)
 
             self.history.append(z.copy())  # Store progression
-            
 
-            for i, point in enumerate(z):
-                print(f"#{i} \n point: {point}")
-            z = self.plot_progression(z)
-            #id = int(input("Enter the id of the point you would like to choose as the preferred point: "))
-            #z = z[id]
-            self.selected_points.append(z)
+            # Use the interactive plot for point selection
+            selected_agent, selected_evaluation = interactive_plot(np.array(z))
+            if selected_evaluation is None:
+                print("No point selected. Exiting.")
+                break
 
-            p = self.bound_points(p, z)
-            print(f"Closeness to reference point: {self.closeness(z, clusters[id])}")
-        
+            print(f"Selected point: {selected_evaluation}")
+            self.selected_points.append(selected_evaluation)
+
+            # Update the Pareto front based on the selected point
+            p = self.bound_points(p, selected_evaluation)
+
         if len(p) <= 1:
-            print(f"Return the selected point: {z}")
-            
-            return self.post_process(z)
-        
-        #for i, point in enumerate(p):
-            print(f"#{i} \n point: {point}")
-        #id = int(input("Enter the id of the point you would like to choose as the FINAL preferred point: "))
-        z = self.plot_progression(p)
-        self.selected_points.append(z)
+            print(f"Returning the selected point: {selected_evaluation}")
+            return self.post_process(selected_evaluation)
+
+        # Final selection
+        selected_agent, selected_evaluation = interactive_plot(np.array(p))
+        self.selected_points.append(selected_evaluation)
         self.plot_progression_static()
-        
-        return z
+
+        return selected_evaluation
             
     def post_process(self, z):
         p = np.array(self.nd_solutions)  # Convert list to NumPy array for efficiency
@@ -153,78 +149,6 @@ class E_NAUTILUS:
             clustered_points.append(centroid)  
 
         return np.array(clustered_points)
-    
-    def plot_progression(self, z):
-        """
-        Plots the Pareto front, intermediate points, and selected points.
-        Allows the user to select a point interactively by clicking on the graph.
-        """
-        pareto_x, pareto_y = zip(*self.nd_solutions)
-        if self.selected_points:
-            selected_x, selected_y = zip(*self.selected_points)
-        else:
-            selected_x, selected_y = [], []
-
-        fig, ax = plt.subplots(figsize=(8, 6))
-
-        # Plot Pareto front
-        ax.scatter(pareto_x, pareto_y, color='green', label="Pareto Front (All Points)")
-
-        # Plot intermediate selections
-        for step, step_points in enumerate(self.history):
-            step_x, step_y = zip(*step_points)
-            label = "Previous Iteration(s)" if step == 0 else None
-            ax.scatter(step_x, step_y, color='gray', alpha=0.3, label=label)
-
-        # Plot user-selected points
-        ax.scatter(selected_x[:-1], selected_y[:-1], color='blue', marker='x', s=100, label="Intermediate Selections")
-
-        # Plot final user choice
-        if selected_x and selected_y:
-            ax.scatter(selected_x[-1], selected_y[-1], color='red', marker='*', s=200, label="Final Choice")
-
-        # Draw path of selected points
-        ax.plot(selected_x, selected_y, linestyle='--', color='gray', label="Selection Path")
-
-        # Draw vertical and horizontal lines only for the most recent selection
-        if self.selected_points:
-            latest_x, latest_y = self.selected_points[-1]
-            ax.axvline(x=latest_x, color='blue', linestyle='--', alpha=0.5)  # Vertical line for latest point
-            ax.axhline(y=latest_y, color='blue', linestyle='--', alpha=0.5)  # Horizontal line for latest point
-
-        ax.set_xlabel("Objective 1")
-        ax.set_ylabel("Objective 2")
-        ax.set_title("E-NAUTILUS Progression with History and Boundaries")
-        ax.legend()
-        ax.grid(True)
-
-        # Interactive selection
-        def on_click(event):
-            if event.inaxes != ax:
-                return  # Ignore clicks outside the plot area
-
-            # Get the clicked coordinates
-            clicked_x, clicked_y = event.xdata, event.ydata
-            print(f"Clicked at: ({clicked_x}, {clicked_y})")
-
-            # Find the closest point in the Pareto front
-            distances = np.linalg.norm(z - np.array([clicked_x, clicked_y]), axis=1)
-            closest_index = np.argmin(distances)
-            closest_point = z[closest_index]
-
-            print(f"Selected point: {closest_point}")
-
-            # Add the selected point to the list and update the plot
-            self.selected_points.append(closest_point)
-            plt.close(fig)  # Close the plot after selection
-
-        # Connect the click event to the on_click function
-        cid = fig.canvas.mpl_connect('button_press_event', on_click)
-
-        plt.show()
-
-        # Return the last selected point
-        return self.selected_points[-1] if self.selected_points else None
 
     def plot_progression_static(self):
         """

@@ -21,6 +21,7 @@ import wandb
 from scipy.optimize import least_squares
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import igmorl.utils as utils
 
 from morl_baselines.common.evaluation import log_all_multi_policy_metrics
 from morl_baselines.common.morl_algorithm import MOAgent
@@ -780,7 +781,7 @@ class IGMORL(MOAgent):
 
         print("\nCurrent Pareto Front:")
         pareto_points = []
-        agent_data_list = []  # Store all agents and their evaluations
+        agents = [] 
 
         for a, evaluation in zip(self.archive.individuals, self.archive.evaluations):
             scalarized = np.dot(evaluation, np.array([1.0, 1.0]))
@@ -791,59 +792,15 @@ class IGMORL(MOAgent):
             print(f"Current Weights: {a.np_weights}")
 
             # Store the agent and its evaluation
-            agent_data_list.append((a, evaluation))
+            agents.append(a)
             pareto_points.append(evaluation)
 
         pareto_points = np.array(pareto_points)
 
-        # Interactive plot
-        fig, ax = plt.subplots(figsize=(8, 6))
-        scatter = ax.scatter(pareto_points[:, 0], pareto_points[:, 1], color='blue', picker=True)  # Set all points to blue
-        ax.set_xlabel("Objective 1")
-        ax.set_ylabel("Objective 2")
-        ax.set_title("Interactive Pareto Front Selection")
-        selected_point_marker = None  # Marker for the selected point
-
-        selected_agent = None
-
-        def on_click(event):
-            nonlocal selected_agent, selected_point_marker
-            if event.inaxes != ax:
-                return
-
-            # Get the clicked coordinates
-            clicked_x, clicked_y = event.xdata, event.ydata
-            print(f"Clicked at: ({clicked_x}, {clicked_y})")
-
-            # Find the closest point in the Pareto front
-            distances = np.linalg.norm(pareto_points - np.array([clicked_x, clicked_y]), axis=1)
-            closest_index = np.argmin(distances)
-            closest_point = pareto_points[closest_index]
-
-            # Retrieve the selected agent and evaluation
-            selected_agent, selected_evaluation = agent_data_list[closest_index]
-
-            print(f"Selected Agent ID: {selected_agent.id}")
-            print(f"Closest Point: {closest_point}")
-
-            # Update the bounds
-            self.bounds = selected_evaluation * 1.1  # Update the bounds with a small delta
-
-            # Update the plot to highlight the selected point
-            if selected_point_marker:
-                selected_point_marker.remove()  # Remove the previous marker
-            selected_point_marker = ax.scatter(
-                closest_point[0], closest_point[1], color='red', s=100, label="Selected Point"
-            )
-            ax.legend()
-            plt.draw()  # Update the plot to show the highlighted point
-
-        # Connect the click event to the on_click function
-        fig.canvas.mpl_connect('button_press_event', on_click)
-
-        plt.show()
+        selected_agent, selected_evaluation = utils.interactive_plot(pareto_points, agents)
 
         if selected_agent is not None:
+            self.bounds = selected_evaluation * 1.1  # Update the bounds with a small delta
             print("\nSelected Agent Details:")
             print(f"ID: {selected_agent.id}")
             print(f"Weights: {selected_agent.np_weights}")
