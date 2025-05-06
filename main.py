@@ -8,10 +8,11 @@ import matplotlib.pyplot as plt
 import gymnasium as gym
 from gymnasium.envs.registration import register
 from igmorl.igmorl import IGMORL, make_env
-from config import *
 from igmorl.e_nautilus import E_NAUTILUS
 from matplotlib.animation import FuncAnimation
 import json
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 # Add the parent directory of 'examples' to sys.path
 sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
@@ -19,28 +20,32 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "examples"))
 
 # Define command-line arguments
 parser = argparse.ArgumentParser(description="Run the MORL algorithm with configurable parameters.")
-parser.add_argument("--config", type=str, default="config_car", help="Configuration to use (e.g., config_nile, config_test).")
-parser.add_argument("--interactive", type=bool, default=False, help="Enable or disable interactive mode (True/False).")
+parser.add_argument("--cfg", type=str, default="config_car", help="Configuration to use (e.g., config_nile, config_test).")
+parser.add_argument("--i", type=bool, default=False, help="Enable or disable interactive mode (True/False).")
 parser.add_argument("--save", type=bool, default=False, help="Enable or disable saving results (True/False).")
 parser.add_argument("--log", type=bool, default=False, help="Enable or disable logging (True/False).")
-parser.add_argument("--has_target", type=bool, default=False, help="Enable or disable target checking (True/False).")
+parser.add_argument("--has_t", type=bool, default=False, help="Enable or disable target checking (True/False).")
+parser.add_argument("--t", type=np.ndarray, default=[100, 100], help="Target for the Nile River simulation (e.g., [-1, -1.5]).")
+parser.add_argument("--a", type=bool, default=False, help="Enable or disable artificial user selection (True/False).")
+parser.add_argument("--out", type=str, default="agent_performance.csv", help="Output file name for agent performance data.")
+parser.add_argument("--exp", type=str, default="no_interactive", help="Experiment type (e.g., no_interactive, interactive).")
+
 
 # Parse the arguments
 args = parser.parse_args()
 
 # Assign the parsed arguments to variables
-CONFIG = args.config
-INTERACTIVE = args.interactive
+CONFIG = args.cfg
+INTERACTIVE = args.i
 SAVE = args.save
 LOG = args.log
-HAS_TARGET = args.has_target
+HAS_TARGET = args.has_t
+ARTIFICIAL = args.a  # Set to True for artificial user selection, interactive needs to be "True" as well
+TARGET = args.t  # Target for the Nile River simulation
+EXPERIMENT = args.exp  # Change to "interactive" for interactive agents
+OUTPUT = args.out
 
-SEED = 42
 E_NAUT = False
-ARTIFICIAL = True  # Set to True for artificial user selection, interactive needs to be "True" as well
-TARGET = np.array([-1, -1.5])  # Target for the Nile River simulation
-EXPERIMENT = "no_interactive"  # Change to "interactive" for interactive agents
-OUTPUT = 'nile_agent_performance.csv'
 
 # Register the custom environment
 register(
@@ -54,8 +59,7 @@ register(
     kwargs={'custom_obj': ['ethiopia_power', 'egypt_deficit_minimised']}
 )
 
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+
 
 def user_utility(a, b):
     return a * 0.7 + b * 0.3
