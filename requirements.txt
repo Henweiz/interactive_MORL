@@ -1,0 +1,10 @@
+gymnasium==1.1.1
+matplotlib==3.10.1
+mo_gymnasium==1.3.1
+morl_baselines==1.1.0
+numpy==2.2.5
+pandas==2.2.3
+scipy==1.15.2
+torch==2.5.0+cu124
+tqdm==4.66.5
+typing_extensions==4.13.2
