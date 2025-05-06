@@ -364,6 +364,7 @@ class IGMORL(MOAgent):
         gae_lambda: float = 0.95,
         device: Union[th.device, str] = "auto",
         group: Optional[str] = None,
+        has_target: bool = False,
         target: np.ndarray = np.array([0.0, 0.0]),
         interactive: bool = True,
         artificial: bool = False,
@@ -420,6 +421,7 @@ class IGMORL(MOAgent):
         self.tmp_env.close()
         self.gamma = gamma
         self.bounds = origin
+        self.has_target = has_target
         self.target = target
 
         # EA parameters
@@ -768,6 +770,13 @@ class IGMORL(MOAgent):
                     'global_step': self.global_step,
                     'pareto_front': deepcopy(self.archive.evaluations)
                 })
+
+                # Check if the target is achieved
+                if self.has_target:
+                    for evaluation in self.archive.evaluations:
+                        if np.all(evaluation >= self.target): 
+                            print(f"Target achieved by an agent with evaluation: {evaluation}")
+                            break
 
                 if self.interactive and iteration < max_iterations:
                     self.selected_agent = self.user_select()

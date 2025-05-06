@@ -1,11 +1,7 @@
+import argparse
 import os
 import sys
 from pathlib import Path
-
-# Add the parent directory of 'examples' to sys.path
-sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
-sys.path.append(str(Path(__file__).resolve().parents[1] / "examples"))
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,15 +11,35 @@ from igmorl.igmorl import IGMORL, make_env
 from config import *
 from igmorl.e_nautilus import E_NAUTILUS
 from matplotlib.animation import FuncAnimation
+import json
+
+# Add the parent directory of 'examples' to sys.path
+sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
+sys.path.append(str(Path(__file__).resolve().parents[1] / "examples"))
+
+# Define command-line arguments
+parser = argparse.ArgumentParser(description="Run the MORL algorithm with configurable parameters.")
+parser.add_argument("--config", type=str, default="config_car", help="Configuration to use (e.g., config_nile, config_test).")
+parser.add_argument("--interactive", type=bool, default=False, help="Enable or disable interactive mode (True/False).")
+parser.add_argument("--save", type=bool, default=False, help="Enable or disable saving results (True/False).")
+parser.add_argument("--log", type=bool, default=False, help="Enable or disable logging (True/False).")
+parser.add_argument("--has_target", type=bool, default=False, help="Enable or disable target checking (True/False).")
+
+# Parse the arguments
+args = parser.parse_args()
+
+# Assign the parsed arguments to variables
+CONFIG = args.config
+INTERACTIVE = args.interactive
+SAVE = args.save
+LOG = args.log
+HAS_TARGET = args.has_target
 
 SEED = 42
-SAVE = False
 E_NAUT = False
-LOG = False
-INTERACTIVE = True
 ARTIFICIAL = True  # Set to True for artificial user selection, interactive needs to be "True" as well
+TARGET = np.array([-1, -1.5])  # Target for the Nile River simulation
 EXPERIMENT = "no_interactive"  # Change to "interactive" for interactive agents
-CONFIG = "config_1"  # Change to "config_test" for testing
 OUTPUT = 'nile_agent_performance.csv'
 
 # Register the custom environment
@@ -42,7 +58,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 def user_utility(a, b):
-    return a * 0.3 + b * 0.7
+    return a * 0.7 + b * 0.3
 
 def plot_pareto_progression(history, show=True, save_path="pareto_front_evolution.mp4"):
     """Visualizes how the Pareto front evolved during training and saves it as a video.
@@ -161,35 +177,51 @@ def run_e_naut():
     print("Final Selected Solution:", selected_solution)
     return selected_solution
 
-if __name__ == "__main__":
-    #run_e_naut()
+# Load the configuration from the JSON file
+def load_config(config_name):
+    config_path = os.path.join(os.getcwd(), "config.json")
+    with open(config_path, "r") as file:
+        configs = json.load(file)
+    if config_name not in configs:
+        raise ValueError(f"Unknown configuration: {config_name}")
+    config = configs[config_name]
 
+    # Convert lists to NumPy arrays where necessary
+    config["ref_point"] = np.array(config["ref_point"])
+    config["origin"] = np.array(config["origin"])
+    return config
+
+# Example usage
+if __name__ == "__main__":
     config = load_config(CONFIG)
 
     # Initialize the algorithm using parameters from the selected configuration
     algo = IGMORL(
-        env_id=config['env_id'],
-        num_envs=config['num_envs'],
-        pop_size=config['pop_size'],
-        warmup_iterations=config['warmup_iterations'],
-        evolutionary_iterations=config['evolutionary_iterations'],
-        num_weight_candidates=config['num_weight_candidates'],
-        origin=config['origin'],
-        steps_per_iteration=config['steps_per_iteration'],
-        delta_weight=config['delta_weight'],
+        env_id=config["env_id"],
+        num_envs=config["num_envs"],
+        pop_size=config["pop_size"],
+        warmup_iterations=config["warmup_iterations"],
+        evolutionary_iterations=config["evolutionary_iterations"],
+        num_weight_candidates=config["num_weight_candidates"],
+        origin=config["origin"],
+        steps_per_iteration=config["steps_per_iteration"],
+        delta_weight=config["delta_weight"],
         log=LOG,
-        seed=config['seed'],
+        seed=config["seed"],
         interactive=INTERACTIVE,
         artificial=ARTIFICIAL,
         user_utility=user_utility,
-        target=np.array([6, -2])  # Target for the interactive agents
+        has_target=HAS_TARGET,
+        target=TARGET
     )
 
     # Train the algorithm using parameters from the selected configuration
     history = algo.train(
-        total_timesteps=config['total_timesteps'],
-        eval_env=make_env(config['env_id'], config['seed'], 1, "PGMORL_eval_env", config['gamma'])(),
-        ref_point=config['ref_point'],
+        total_timesteps=config["total_timesteps"],
+        eval_env=make_env(
+            config["env_id"], config["seed"], 1, "PGMORL_eval_env", config["gamma"]
+        )(),
+        ref_point=config["ref_point"],
         known_pareto_front=None,
     )
     
