@@ -18,9 +18,25 @@ from matplotlib.animation import FuncAnimation
 sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
 sys.path.append(str(Path(__file__).resolve().parents[1] / "examples"))
 
+def user_utility_focus_a(a, b):
+    return a * 0.7 + b * 0.3
+
+def user_utility_focus_b(a, b):
+    return a * 0.3 + b * 0.7
+
+def user_utility_even(a, b):
+    return a * 0.5 + b * 0.5
+
+# Map utility function names to their implementations
+UTILITY_FUNCTIONS = {
+    "focus_a": user_utility_focus_a,
+    "focus_b": user_utility_focus_b,
+    "even": user_utility_even,
+}
+
 # Define command-line arguments
 parser = argparse.ArgumentParser(description="Run the MORL algorithm with configurable parameters.")
-parser.add_argument("--cfg", type=str, default="config_car", help="Configuration to use (e.g., config_nile, config_test).")
+parser.add_argument("--cfg", type=str, default="car", help="Configuration to use (e.g., nile, cheetah).")
 parser.add_argument("--i", type=bool, default=False, help="Enable or disable interactive mode (True/False).")
 parser.add_argument("--save", type=bool, default=False, help="Enable or disable saving results (True/False).")
 parser.add_argument("--log", type=bool, default=False, help="Enable or disable logging (True/False).")
@@ -29,7 +45,8 @@ parser.add_argument("--t", type=np.ndarray, default=[100, 100], help="Target for
 parser.add_argument("--a", type=bool, default=False, help="Enable or disable artificial user selection (True/False).")
 parser.add_argument("--out", type=str, default="agent_performance.csv", help="Output file name for agent performance data.")
 parser.add_argument("--exp", type=str, default="no_interactive", help="Experiment type (e.g., no_interactive, interactive).")
-
+parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
+parser.add_argument("--uu", type=str, default="even", choices=UTILITY_FUNCTIONS.keys(), help="User utility function to use (e.g., focus_a, focus_b, even).")
 
 # Parse the arguments
 args = parser.parse_args()
@@ -44,8 +61,12 @@ ARTIFICIAL = args.a  # Set to True for artificial user selection, interactive ne
 TARGET = args.t  # Target for the Nile River simulation
 EXPERIMENT = args.exp  # Change to "interactive" for interactive agents
 OUTPUT = args.out
+SEED = args.seed
 
 E_NAUT = False
+
+# Retrieve the selected utility function
+user_utility = UTILITY_FUNCTIONS[args.uu]
 
 # Register the custom environment
 register(
@@ -54,15 +75,12 @@ register(
 )
 
 register(
-    id='nile2-v0',
+    id='nile2-v1',
     entry_point='env.wms_morl-main.examples.nile_river_simulation:create_nile_river_env',
-    kwargs={'custom_obj': ['ethiopia_power', 'egypt_deficit_minimised']}
+    kwargs={'custom_obj': ['ethiopia_power', 'HAD_minimum_water_level']}
 )
 
 
-
-def user_utility(a, b):
-    return a * 0.7 + b * 0.3
 
 def plot_pareto_progression(history, show=True, save_path="pareto_front_evolution.mp4"):
     """Visualizes how the Pareto front evolved during training and saves it as a video.
@@ -211,7 +229,7 @@ if __name__ == "__main__":
         steps_per_iteration=config["steps_per_iteration"],
         delta_weight=config["delta_weight"],
         log=LOG,
-        seed=config["seed"],
+        seed=SEED,
         interactive=INTERACTIVE,
         artificial=ARTIFICIAL,
         user_utility=user_utility,
@@ -220,22 +238,23 @@ if __name__ == "__main__":
     )
 
     # Train the algorithm using parameters from the selected configuration
-    history = algo.train(
+    history, bounds = algo.train(
         total_timesteps=config["total_timesteps"],
         eval_env=make_env(
-            config["env_id"], config["seed"], 1, "PGMORL_eval_env", config["gamma"]
+            config["env_id"], SEED, 1, "PGMORL_eval_env", config["gamma"]
         )(),
         ref_point=config["ref_point"],
         known_pareto_front=None,
     )
     
-    env = make_env(config['env_id'], (config['seed']-1), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
+    env = make_env(config['env_id'], (SEED-1), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
 
     print(len(algo.archive.individuals))
+    print(f"Boundaries: {bounds}")
     
     # Save the video in the current directory
     save_path = os.path.join(os.getcwd(), "pareto_front_evolution.mp4")
-    plot_pareto_progression(history, show=True, save_path=save_path)
+    #plot_pareto_progression(history, show=True, save_path=save_path)
     
 
     all_rewards = []
@@ -244,59 +263,38 @@ if __name__ == "__main__":
 
     # Visualization of trained policies
     for (a, e) in zip(algo.archive.individuals, algo.archive.evaluations):
-        # Evaluate policy
-        #scalarized, discounted_scalarized, reward, discounted_reward = a.policy_eval(env, num_episodes=5, scalarization=np.dot, weights=np.array([1.0, 1.0]))
-        
-        # Prepare agent data
-        agent_info = {
-            'Experiment': EXPERIMENT,
-            'Agent ID': a.id,
-            #'#Scalarized': scalarized,
-            'Vectorial Reward': ";".join(map(str, e)),  # Convert list to string for CSV
-            'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
-        }
-        
-        # Append agent data to the list
-        agent_data.append(agent_info)
+        # Check if the evaluation is better than the bounds
+        if np.all(e >= bounds):  # Only process agents with evaluations better than the bounds
+            # Prepare agent data
+            agent_info = {
+                'Experiment': EXPERIMENT,
+                'Agent ID': a.id,
+                'Vectorial Reward': ";".join(map(str, e)),  # Convert list to string for CSV
+                'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
+            }
 
-        # Optionally print to the console (as in your original code)
-        print(f"Agent #{a.id}")
-        #print(f"Scalarized: {scalarized}")
-        print(f"Vectorial: {e}")
-        print(f"Weights: {a.np_weights}")
+            # Append agent data to the list
+            agent_data.append(agent_info)
 
-        # Store the reward vector
-        all_rewards.append(e)
+            # Optionally print to the console (as in your original code)
+            print(f"Agent #{a.id}")
+            print(f"Vectorial: {e}")
+            print(f"Weights: {a.np_weights}")
 
-    if SAVE:
+    # Save results if there are any agents that meet the condition
+    if SAVE and agent_data:
         # Convert the list of agent data into a DataFrame
         df = pd.DataFrame(agent_data)
 
-        # Save the DataFrame to an Excel file
-        # Check if file exists to avoid writing headers again
+        # Save the DataFrame to a CSV file
         file_exists = os.path.isfile(OUTPUT)
 
         # Append data to CSV (without writing headers if the file already exists)
         df.to_csv(OUTPUT, mode='a', index=False, header=not file_exists)
 
         print(f"Data has been written to {OUTPUT}")
-
-    # Convert to NumPy array for easy slicing
-    all_rewards = np.array(all_rewards)
-
-    # Scatter plot
-    plt.figure(figsize=(6, 6))
-    plt.scatter(all_rewards[:, 0], all_rewards[:, 1], color='b', label="Agents")
-
-    # Labels and title
-    plt.xlabel("Reward Dimension 1")
-    plt.ylabel("Reward Dimension 2")
-    plt.title("Vectorial Rewards of Agents")
-    plt.legend()
-    plt.grid(True)
-
-    # Show plot
-    plt.show()
+    else:
+        print("No agents met the criteria to save results.")
 
     if E_NAUT:
         df = pd.DataFrame(all_rewards, columns=["Reward 1", "Reward 2"])

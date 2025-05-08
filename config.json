@@ -1,7 +1,6 @@
 {
-    "config_car": {
+    "car": {
       "env_id": "mo-mountaincarcontinuous-v0",
-      "seed": 42,
       "ref_point": [-110, -110],
       "num_envs": 4,
       "pop_size": 6,
@@ -14,13 +13,12 @@
       "total_timesteps": 2500000,
       "gamma": 0.995
     },
-    "config_nile": {
-      "env_id": "nile2-v0",
-      "seed": 2,
-      "ref_point": [0, -240],
+    "nile": {
+      "env_id": "nile2-v1",
+      "ref_point": [0, 0],
       "num_envs": 4,
       "pop_size": 6,
-      "warmup_iterations": 60,
+      "warmup_iterations": 20,
       "evolutionary_iterations": 20,
       "num_weight_candidates": 50,
       "origin": [0, -240],
@@ -29,9 +27,8 @@
       "total_timesteps": 2000000,
       "gamma": 0.99
     },
-    "config_cheetah": {
+    "cheetah": {
         "env_id": "mo-halfcheetah-v5",
-        "seed": 42,
         "ref_point": [-100, -100],
         "num_envs": 4,
         "pop_size": 6,
@@ -44,9 +41,8 @@
         "total_timesteps": 2000000,
         "gamma": 0.99
     },
-    "config_test": {
+    "test": {
       "env_id": "mo-mountaincarcontinuous-v0",
-      "seed": 42,
       "ref_point": [-110, -110],
       "num_envs": 4,
       "pop_size": 4,

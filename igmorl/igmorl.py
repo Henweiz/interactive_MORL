@@ -213,8 +213,6 @@ import numpy as np
 
 def generate_weights(delta_weight: float) -> np.ndarray:
     """Generates weights uniformly distributed over the objective dimensions. These weight vectors are separated by delta_weight distance.
-    
-    Ensures that [0.5, 0.5] is included in the generated weights.
 
     Args:
         delta_weight: Distance between weight vectors.
@@ -223,11 +221,6 @@ def generate_weights(delta_weight: float) -> np.ndarray:
         A numpy array of candidate weights.
     """
     weights = np.linspace((0.0, 1.0), (1.0, 0.0), int(1 / delta_weight) + 1, dtype=np.float32)
-
-    # Check if [0.5, 0.5] is already in the array
-    target_weight = np.array([0.5, 0.5], dtype=np.float32)
-    if not np.any(np.all(np.isclose(weights, target_weight), axis=1)):
-        weights = np.vstack([weights, target_weight])  # Add [0.5, 0.5] if missing
 
     return weights
 
@@ -786,7 +779,7 @@ class IGMORL(MOAgent):
         self.env.close()
         if self.log:
             self.close_wandb()
-        return pareto_front_history
+        return pareto_front_history, self.bounds
 
     def user_select(self):
         """User selection of their preferred policy based on the current Pareto front with reselection support."""
