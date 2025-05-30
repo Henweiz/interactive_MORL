@@ -1,15 +1,18 @@
 import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster
 import matplotlib.pyplot as plt
-from igmorl.utils import interactive_plot  # Import the interactive plot function
+from igmorl.utils import interactive_plot, artifical_user_selection  # Import the interactive plot function
 
 class E_NAUTILUS:
-    def __init__(self, nd_solutions):
+    def __init__(self, nd_solutions, artificial=False, **kwargs):
         self.nd_solutions = nd_solutions
         self.nadir = np.min(nd_solutions, axis=0)
         self.ideal = np.max(nd_solutions, axis=0)
         self.selected_points = []  # Store all selected points
         self.history = []  # Store full history of selection
+        self.artificial = artificial
+        if artificial:
+            self.user_utility = kwargs.get('user_utility', None)
 
     #TODO: Add failsafe for when the user inputs weird stuff
     def initial_pref(self):
@@ -38,7 +41,11 @@ class E_NAUTILUS:
             self.history.append(z.copy())  # Store progression
 
             # Use the interactive plot for point selection
-            selected_agent, selected_evaluation = interactive_plot(np.array(z))
+            if self.artificial:
+                # Simulate user selection based on a utility function
+                selected_evaluation = artifical_user_selection(self.user_utility, np.array(z))
+            else:
+                selected_agent, selected_evaluation = interactive_plot(np.array(z))
             if selected_evaluation is None:
                 print("No point selected. Exiting.")
                 break
