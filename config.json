@@ -13,19 +13,33 @@
       "total_timesteps": 2500000,
       "gamma": 0.995
     },
-    "nile": {
-      "env_id": "nile2-v1",
-      "ref_point": [0, 0],
+    "target_car": {
+      "env_id": "mo-mountaincarcontinuous-v0",
+      "ref_point": [-110, -110],
       "num_envs": 4,
       "pop_size": 6,
-      "warmup_iterations": 20,
+      "warmup_iterations": 10,
+      "evolutionary_iterations": 10,
+      "num_weight_candidates": 50,
+      "origin": [-110, -110],
+      "steps_per_iteration": 1000,
+      "delta_weight": 0.2,
+      "total_timesteps": 5000000,
+      "gamma": 0.995
+    },
+    "nile": {
+      "env_id": "nile2-v1",
+      "ref_point": [-250, -250],
+      "num_envs": 4,
+      "pop_size": 6,
+      "warmup_iterations": 2,
       "evolutionary_iterations": 20,
       "num_weight_candidates": 50,
-      "origin": [0, -240],
-      "steps_per_iteration": 240,
+      "origin": [-250, -250],
+      "steps_per_iteration": 2400,
       "delta_weight": 0.2,
       "total_timesteps": 2000000,
-      "gamma": 0.99
+      "gamma": 1.0
     },
     "cheetah": {
         "env_id": "mo-halfcheetah-v5",
@@ -33,12 +47,26 @@
         "num_envs": 4,
         "pop_size": 6,
         "warmup_iterations": 40,
-        "evolutionary_iterations": 20,
+        "evolutionary_iterations": 40,
         "num_weight_candidates": 50,
         "origin": [-100, -100],
         "delta_weight": 0.2,
         "steps_per_iteration": 400,
-        "total_timesteps": 2000000,
+        "total_timesteps": 5000000,
+        "gamma": 0.99
+    },
+    "target_cheetah": {
+        "env_id": "mo-halfcheetah-v5",
+        "ref_point": [-100, -100],
+        "num_envs": 4,
+        "pop_size": 6,
+        "warmup_iterations": 40,
+        "evolutionary_iterations": 40,
+        "num_weight_candidates": 50,
+        "origin": [-100, -100],
+        "delta_weight": 0.2,
+        "steps_per_iteration": 400,
+        "total_timesteps": 7500000,
         "gamma": 0.99
     },
     "test": {

@@ -564,6 +564,7 @@ class IGMORL(MOAgent):
         """Evaluates all agents and store their current performances on the buffer and pareto archive."""
         for i, agent in enumerate(self.agents):
             _, _, reward, discounted_reward = agent.policy_eval(eval_env, weights=agent.np_weights, log=self.log)
+            #print(discounted_reward)
             # Storing current results
             self.population.add(agent, discounted_reward)
             self.archive.add(agent, discounted_reward)
@@ -769,7 +770,13 @@ class IGMORL(MOAgent):
                     for evaluation in self.archive.evaluations:
                         if np.all(evaluation >= self.target): 
                             print(f"Target achieved by an agent with evaluation: {evaluation}")
+                            print(f"Number of steps: {self.global_step}")
+                            iteration = max_iterations
                             break
+                    if self.interactive:
+                        self.selected_agent = self.closest_to_target()
+                        print(f"New lower bounds: {self.bounds}")
+                        continue
 
                 if self.interactive and iteration < max_iterations:
                     self.selected_agent = self.user_select()
@@ -809,7 +816,7 @@ class IGMORL(MOAgent):
             selected_agent, selected_evaluation = utils.interactive_plot(pareto_points, agents)
 
         if selected_agent is not None:
-            self.bounds = selected_evaluation * 1.1  # Update the bounds with a small delta
+            self.bounds = selected_evaluation - np.sqrt(np.abs(selected_evaluation)) * 0.1
             print("\nSelected Agent Details:")
             print(f"ID: {selected_agent.id}")
             print(f"Weights: {selected_agent.np_weights}")
@@ -817,6 +824,25 @@ class IGMORL(MOAgent):
             return [selected_agent, self.bounds]
         else:
             print("No agent selected.")
+            return None
+    
+    def closest_to_target(self):
+        """Finds the agent closest to the target."""
+        if self.has_target:
+            closest_agent = None
+            closest_distance = float("inf")
+            selected_evaluation = None
+            for a, evaluation in zip(self.archive.individuals, self.archive.evaluations):
+                distance = np.linalg.norm(evaluation - self.target)
+                if distance < closest_distance:
+                    closest_distance = distance
+                    closest_agent = a
+                    selected_evaluation = evaluation
+            if selected_evaluation is not None:
+                self.bounds = selected_evaluation - np.sqrt(np.abs(selected_evaluation)) * 0.1
+            return [closest_agent, self.bounds]
+        else:
+            print("No target defined.")
             return None
 
 

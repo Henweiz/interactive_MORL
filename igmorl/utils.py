@@ -57,7 +57,7 @@ def artifical_user_selection(function, pareto_points, agents):
     Parameters:
     - function: The function to be called for each selected point.
     - pareto_points: The Pareto front points to select from.
-    - agents: Optional. The agents corresponding to the Pareto points.
+    - agents: The agents corresponding to the Pareto points.
     
     Returns:
     - selected_agents: List of selected agents.
@@ -81,3 +81,32 @@ def artifical_user_selection(function, pareto_points, agents):
     print(f"User utility value: {max_val}")
 
     return selected_agent, selected_evaluation
+
+def artifical_user_selection(function, points):
+    """
+    Simulates a user selection of points from the Pareto front.
+    
+    Parameters:
+    - function: The function to be called for each selected point.
+    - pareto_points: The Pareto front points to select from.
+    - agents: The agents corresponding to the Pareto points.
+    
+    Returns:
+    - selected_agents: List of selected agents.
+    - selected_evaluations: List of selected evaluations.
+    """
+    assert len(points) > 0, "Pareto points cannot be empty."
+    assert function 
+
+    selected_point = None
+    max_val = -np.inf
+
+    for i in range(len(points)):
+        val = function(points[i,0], points[i,1])
+        if val >= max_val:
+            max_val = val
+            selected_point = points[i]
+
+    print(f"User utility value: {max_val}")
+
+    return selected_point
