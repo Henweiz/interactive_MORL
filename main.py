@@ -13,6 +13,10 @@ from matplotlib.animation import FuncAnimation
 import json
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import torch as th
+import random
+import time
+import datetime
 
 # Add the parent directory of 'examples' to sys.path
 sys.path.append(str(Path(__file__).resolve().parents[1] / "env" / "wms_morl-main"))
@@ -41,7 +45,7 @@ parser.add_argument("--i", type=bool, default=False, help="Enable or disable int
 parser.add_argument("--save", type=bool, default=False, help="Enable or disable saving results (True/False).")
 parser.add_argument("--log", type=bool, default=False, help="Enable or disable logging (True/False).")
 parser.add_argument("--has_t", type=bool, default=False, help="Enable or disable target checking (True/False).")
-parser.add_argument("--t", type=np.ndarray, default=[100, 100], help="Target for the Nile River simulation (e.g., [-1, -1.5]).")
+parser.add_argument("--t", type=str, default="[100, 100]", help="Target for the Nile River simulation (e.g., [-1, -1.5]).")
 parser.add_argument("--a", type=bool, default=False, help="Enable or disable artificial user selection (True/False).")
 parser.add_argument("--out", type=str, default="agent_performance.csv", help="Output file name for agent performance data.")
 parser.add_argument("--exp", type=str, default="no_interactive", help="Experiment type (e.g., no_interactive, interactive).")
@@ -51,15 +55,19 @@ parser.add_argument("--uu", type=str, default="even", choices=UTILITY_FUNCTIONS.
 # Parse the arguments
 args = parser.parse_args()
 
+# Convert the target argument (string) to a NumPy array
+if isinstance(args.t, str):
+    args.t = np.array(eval(args.t))  # Safely evaluate the string to a list and convert to np.ndarray
+
 # Assign the parsed arguments to variables
 CONFIG = args.cfg
 INTERACTIVE = args.i
 SAVE = args.save
 LOG = args.log
 HAS_TARGET = args.has_t
-ARTIFICIAL = args.a  # Set to True for artificial user selection, interactive needs to be "True" as well
-TARGET = args.t  # Target for the Nile River simulation
-EXPERIMENT = args.exp  # Change to "interactive" for interactive agents
+ARTIFICIAL = args.a
+TARGET = args.t  # Now correctly parsed as a NumPy array
+EXPERIMENT = args.exp
 OUTPUT = args.out
 SEED = args.seed
 
@@ -77,7 +85,7 @@ register(
 register(
     id='nile2-v1',
     entry_point='env.wms_morl-main.examples.nile_river_simulation:create_nile_river_env',
-    kwargs={'custom_obj': ['ethiopia_power', 'HAD_minimum_water_level']}
+    kwargs={'custom_obj': ['ethiopia_power', 'egypt_deficit_minimised']}
 )
 
 
@@ -168,37 +176,6 @@ def plot_pareto_progression(history, show=True, save_path="pareto_front_evolutio
     
     return ani
 
-def run_e_naut():
-    df = pd.read_csv('agent_performance.csv', header=None, names=['type', 'agent_id', 'vectorial', 'weights'])
-
-    # Debug: Print the first few rows of the DataFrame to inspect the 'vectorial' column
-    print("Original DataFrame:")
-    print(df.head())
-
-    # Convert the 'vectorial' column from strings to lists of floats
-    df['vectorial'] = df['vectorial'].apply(lambda x: np.array(list(map(float, x.strip("[]").replace(" ", "").split(";")))))
-
-    # Debug: Print the processed 'vectorial' column to ensure proper conversion
-    print("Processed 'vectorial' column:")
-    print(df['vectorial'].head())
-
-    # Filter for non-interactive agents
-    non_interactive = df[df['type'] == 'no_interactive']
-
-    # Convert the 'vectorial' column to a 2D NumPy array
-    vectorial_array = np.vstack(non_interactive['vectorial'].values)
-
-    # Debug: Print the resulting 2D NumPy array
-    print("2D NumPy array:")
-    print(vectorial_array)
-
-    # Pass the 2D array to E_NAUTILUS
-    e_nautilus = E_NAUTILUS(vectorial_array)
-
-    selected_solution = e_nautilus.run()
-    print("Final Selected Solution:", selected_solution)
-    return selected_solution
-
 # Load the configuration from the JSON file
 def load_config(config_name):
     config_path = os.path.join(os.getcwd(), "config.json")
@@ -215,6 +192,13 @@ def load_config(config_name):
 
 # Example usage
 if __name__ == "__main__":
+    # Set seeds for reproducibility
+    th.manual_seed(SEED)
+    np.random.seed(SEED)
+    random.seed(SEED)
+    if th.cuda.is_available():
+        th.cuda.manual_seed_all(SEED)
+
     config = load_config(CONFIG)
 
     # Initialize the algorithm using parameters from the selected configuration
@@ -237,6 +221,9 @@ if __name__ == "__main__":
         target=TARGET
     )
 
+    # --- TIMER START ---
+    start_time = time.time()
+
     # Train the algorithm using parameters from the selected configuration
     history, bounds = algo.train(
         total_timesteps=config["total_timesteps"],
@@ -246,10 +233,14 @@ if __name__ == "__main__":
         ref_point=config["ref_point"],
         known_pareto_front=None,
     )
-    
+
+    # --- TIMER END ---
+    elapsed_time = time.time() - start_time
+    print(f"Training completed in {str(datetime.timedelta(seconds=int(elapsed_time)))} (hh:mm:ss)")
+
     env = make_env(config['env_id'], (SEED-1), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
 
-    print(len(algo.archive.individuals))
+    print(algo.archive.evaluations)
     print(f"Boundaries: {bounds}")
     
     # Save the video in the current directory
@@ -263,25 +254,25 @@ if __name__ == "__main__":
 
     # Visualization of trained policies
     for (a, e) in zip(algo.archive.individuals, algo.archive.evaluations):
-        # Check if the evaluation is better than the bounds
-        if np.all(e >= bounds):  # Only process agents with evaluations better than the bounds
-            # Prepare agent data
-            agent_info = {
-                'Experiment': EXPERIMENT,
-                'Agent ID': a.id,
-                'Vectorial Reward': ";".join(map(str, e)),  # Convert list to string for CSV
-                'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
-            }
+        # Prepare agent data (no filtering based on bounds)
+        agent_info = {
+            'Experiment': EXPERIMENT,
+            'Agent ID': a.id,
+            'Vectorial Reward': ";".join(map(str, e)),  # Convert list to string for CSV
+            'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
+            'Bounds': ";".join(map(str, bounds)),  # Add bounds as a string
+        }
 
-            # Append agent data to the list
-            agent_data.append(agent_info)
+        # Append agent data to the list
+        agent_data.append(agent_info)
 
-            # Optionally print to the console (as in your original code)
-            print(f"Agent #{a.id}")
-            print(f"Vectorial: {e}")
-            print(f"Weights: {a.np_weights}")
+        # Optionally print to the console (as in your original code)
+        print(f"Agent #{a.id}")
+        print(f"Vectorial: {e}")
+        print(f"Weights: {a.np_weights}")
+        print(f"Bounds: {bounds}")
 
-    # Save results if there are any agents that meet the condition
+    # Save results if there are any agents in the archive
     if SAVE and agent_data:
         # Convert the list of agent data into a DataFrame
         df = pd.DataFrame(agent_data)
