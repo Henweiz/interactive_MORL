@@ -212,6 +212,7 @@ if __name__ == "__main__":
         origin=config["origin"],
         steps_per_iteration=config["steps_per_iteration"],
         delta_weight=config["delta_weight"],
+        sparsity_coeff=config["sparsity_coeff"],
         log=LOG,
         seed=SEED,
         interactive=INTERACTIVE,

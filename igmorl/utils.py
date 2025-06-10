@@ -96,7 +96,10 @@ def artifical_user_selection(function, points):
     - selected_evaluations: List of selected evaluations.
     """
     assert len(points) > 0, "Pareto points cannot be empty."
-    assert function 
+    assert function
+    assert isinstance(points, np.ndarray) and points.ndim == 2 and points.shape[1] == 2, \
+        f"points must be a 2D numpy array of shape (N, 2), got {type(points)} with shape {getattr(points, 'shape', None)}"
+    print(points)
 
     selected_point = None
     max_val = -np.inf

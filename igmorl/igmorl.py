@@ -357,6 +357,7 @@ class IGMORL(MOAgent):
         gae_lambda: float = 0.95,
         device: Union[th.device, str] = "auto",
         group: Optional[str] = None,
+        sparsity_coeff: float = 1.0,
         has_target: bool = False,
         target: np.ndarray = np.array([0.0, 0.0]),
         interactive: bool = True,
@@ -453,6 +454,7 @@ class IGMORL(MOAgent):
         self.clip_vloss = clip_vloss
         self.gae_lambda = gae_lambda
         self.gae = gae
+        self.sparsity_coeff = sparsity_coeff
         self.interactive = interactive
         self.artificial = artificial
         self.selected_agent = [None, None]
@@ -630,7 +632,7 @@ class IGMORL(MOAgent):
                 )
                 # optimization criterion is a hypervolume - sparsity
                 mixture_metrics = [
-                    hypervolume(ref_point, current_front + [predicted_eval]) - sparsity(current_front + [predicted_eval])
+                    hypervolume(ref_point, current_front + [predicted_eval]) - (self.sparsity_coeff * sparsity(current_front + [predicted_eval]))
                     for predicted_eval in predicted_evals
                 ]
                 # Best among all the weights for the current candidate

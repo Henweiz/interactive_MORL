@@ -10,6 +10,7 @@
       "origin": [-110, -110],
       "steps_per_iteration": 1000,
       "delta_weight": 0.2,
+      "sparsity_coeff": 1,
       "total_timesteps": 2500000,
       "gamma": 0.995
     },
@@ -24,6 +25,7 @@
       "origin": [-110, -110],
       "steps_per_iteration": 1000,
       "delta_weight": 0.2,
+      "sparsity_coeff": 1,
       "total_timesteps": 5000000,
       "gamma": 0.995
     },
@@ -38,6 +40,7 @@
       "origin": [-250, -250],
       "steps_per_iteration": 2400,
       "delta_weight": 0.2,
+      "sparsity_coeff": 1,
       "total_timesteps": 2000000,
       "gamma": 1.0
     },
@@ -51,6 +54,7 @@
         "num_weight_candidates": 50,
         "origin": [-100, -100],
         "delta_weight": 0.2,
+        "sparsity_coeff": 1,
         "steps_per_iteration": 400,
         "total_timesteps": 5000000,
         "gamma": 0.99
@@ -65,8 +69,24 @@
         "num_weight_candidates": 50,
         "origin": [-100, -100],
         "delta_weight": 0.2,
+        "sparsity_coeff": 1,
         "steps_per_iteration": 400,
         "total_timesteps": 7500000,
+        "gamma": 0.99
+    },
+      "hopper": {
+        "env_id": "mo-hopper-2obj-v5",
+        "ref_point": [-100, -100],
+        "num_envs": 4,
+        "pop_size": 6,
+        "warmup_iterations": 80,
+        "evolutionary_iterations": 20,
+        "num_weight_candidates": 50,
+        "origin": [-100, -100],
+        "delta_weight": 0.2,
+        "sparsity_coeff": 1000000,
+        "steps_per_iteration": 2048,
+        "total_timesteps": 5000000,
         "gamma": 0.99
     },
     "test": {
@@ -80,6 +100,7 @@
       "origin": [-110, -110],
       "steps_per_iteration": 100,
       "delta_weight": 0.2,
+      "sparsity_coeff": 1,
       "total_timesteps": 5000,
       "gamma": 0.995
     }

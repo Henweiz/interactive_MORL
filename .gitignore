@@ -171,3 +171,4 @@ cython_debug/
 wandb/
 results/
 scripts/
+env/
