@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Read the data from CSV file
-df = pd.read_csv('results/cheetah/all.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
+df = pd.read_csv('results/cheetah/42.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
 
 # Remove square brackets and split the vectorial column into x and y components
 df['Vectorial Reward'] = df['Vectorial Reward'].str.strip("[]")  # Remove square brackets

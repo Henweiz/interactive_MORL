@@ -55,15 +55,22 @@ class E_NAUTILUS:
 
             # Update the Pareto front based on the selected point
             p = self.bound_points(p, selected_evaluation)
+            z = selected_evaluation
 
         if len(p) <= 1:
             print(f"Returning the selected point: {selected_evaluation}")
             return self.post_process(selected_evaluation)
 
         # Final selection
-        selected_agent, selected_evaluation = interactive_plot(np.array(p))
-        self.selected_points.append(selected_evaluation)
-        self.plot_progression_static()
+        if self.artificial:
+            # Simulate user selection based on a utility function
+            selected_evaluation = artifical_user_selection(self.user_utility, np.array(p))
+        else:
+            selected_agent, selected_evaluation = interactive_plot(np.array(p))
+        
+        if not self.artificial:
+            self.selected_points.append(selected_evaluation)
+            self.plot_progression_static()
 
         return selected_evaluation
             
@@ -81,10 +88,10 @@ class E_NAUTILUS:
         closest_point = p[closest_index]
 
         print(f"Post-processing... Closest point to selected preferred solution: {closest_point}")
-        self.history.append(closest_point.copy())  # Store the final selected point in history
-        self.selected_points.append(closest_point)
-
-        self.plot_progression_static()
+        if not self.artificial:
+            self.history.append(closest_point.copy())  # Store the final selected point in history
+            self.selected_points.append(closest_point)
+            self.plot_progression_static()
 
         return closest_point
     
@@ -108,6 +115,7 @@ class E_NAUTILUS:
         points = []
         print(clusters)
         for cluster in clusters:
+            print(f"Previous point: {prev_z}, Cluster: {cluster}, Iteration: {h}")
             z = self.compute_intermediate_point(prev_z, cluster, h)
             points.append(z)
         return points
@@ -115,15 +123,9 @@ class E_NAUTILUS:
     def compute_intermediate_point(self, prev_point, reference_point, iteration):
         """
         Computes the intermediate point in the E-NAUTILUS method.
-        
-        Parameters:
-        - prev_z (numpy array): The previous intermediate point (z^{h-1}).
-        - reference_z (numpy array): The reference Pareto-optimal solution (z̄).
-        - iteration (int): The current iteration number (it^h).
-        
-        Returns:
-        - numpy array: The new intermediate point (z^h).
         """
+        prev_point = prev_point
+        reference_point = reference_point
         if iteration <= 0:
             raise ValueError("Iteration count must be positive.")
         
@@ -155,7 +157,7 @@ class E_NAUTILUS:
         
             clustered_points.append(centroid)  
 
-        return np.array(clustered_points)
+        return clustered_points
 
     def plot_progression_static(self):
         """

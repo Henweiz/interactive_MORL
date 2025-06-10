@@ -1,7 +1,11 @@
 import pandas as pd
+from run_naut import run_e_naut
 
 # Load the data
-df = pd.read_csv('results/cheetah/all.csv', header=None, 
+file_path = 'results/car/car.csv'
+type = "no_interactive_mocar"
+
+df = pd.read_csv(file_path, header=None, 
                  names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
 
 # Remove square brackets and split the vectorial column into x and y components
@@ -22,9 +26,7 @@ def only_a(a, b):
     return a
 def only_b(a, b):
     return b
-# Add utility functions for only a and only b
-df['only_a'] = df.apply(lambda row: only_a(row['x'], row['y']), axis=1)
-df['only_b'] = df.apply(lambda row: only_b(row['x'], row['y']), axis=1)
+
 
 # Add utility values to the DataFrame
 df['utility_focus_a'] = df.apply(lambda row: user_utility_focus_a(row['x'], row['y']), axis=1)
@@ -36,9 +38,37 @@ best_values = df.groupby('type').agg({
     'utility_focus_a': 'max',
     'utility_focus_b': 'max',
     'utility_even': 'max',
-    'only_a': 'max',
-    'only_b': 'max'
 }).reset_index()
 
-# Print the results
+# Compute E-NAUTILUS results for each utility function
+enautilus_focus_a = run_e_naut(
+    file_path=file_path,
+    type=type,
+    artificial=True,
+    user_utility=user_utility_focus_a
+)
+enautilus_focus_b = run_e_naut(
+    file_path=file_path,
+    type=type,
+    artificial=True,
+    user_utility=user_utility_focus_b
+)
+enautilus_even = run_e_naut(
+    file_path=file_path,
+    type=type,
+    artificial=True,
+    user_utility=user_utility_even
+)
+
+# Create a row for E-NAUTILUS results, matching the DataFrame columns
+enautilus_row = {
+    'type': 'e-nautilus',
+    'utility_focus_a': user_utility_focus_a(*enautilus_focus_a),
+    'utility_focus_b': user_utility_focus_b(*enautilus_focus_b),
+    'utility_even': user_utility_even(*enautilus_even)
+}
+
+# Append the row to the DataFrame
+best_values = pd.concat([best_values, pd.DataFrame([enautilus_row])], ignore_index=True)
+
 print(best_values)
