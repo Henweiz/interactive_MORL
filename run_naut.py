@@ -49,4 +49,4 @@ def run_e_naut(type='no_interactive', file_path='agent_performance.csv', artific
     return selected_solution
 
 if __name__ == "__main__":
-    run_e_naut(type="no_interactive_mocar", file_path="car_performance.csv")
+    run_e_naut(type="no_interactive_mocar", file_path="results/car/car.csv")

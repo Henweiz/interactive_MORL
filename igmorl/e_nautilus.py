@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster
 import matplotlib.pyplot as plt
-from igmorl.utils import interactive_plot, artifical_user_selection  # Import the interactive plot function
+from igmorl.utils import interactive_plot, artifical_user_selection2  # Import the interactive plot function
 
 class E_NAUTILUS:
     def __init__(self, nd_solutions, artificial=False, **kwargs):
@@ -43,7 +43,7 @@ class E_NAUTILUS:
             # Use the interactive plot for point selection
             if self.artificial:
                 # Simulate user selection based on a utility function
-                selected_evaluation = artifical_user_selection(self.user_utility, np.array(z))
+                selected_evaluation, max_val = artifical_user_selection2(self.user_utility, np.array(z))
             else:
                 selected_agent, selected_evaluation = interactive_plot(np.array(z))
             if selected_evaluation is None:
@@ -64,7 +64,7 @@ class E_NAUTILUS:
         # Final selection
         if self.artificial:
             # Simulate user selection based on a utility function
-            selected_evaluation = artifical_user_selection(self.user_utility, np.array(p))
+            selected_evaluation, max_val = artifical_user_selection2(self.user_utility, np.array(p))
         else:
             selected_agent, selected_evaluation = interactive_plot(np.array(p))
         
@@ -149,13 +149,16 @@ class E_NAUTILUS:
 
         clustered_points = []
         for i in range(1, n_points + 1):
-            indices = np.where(clusters == i)[0]  
+            indices = np.where(clusters == i)[0]
             cluster = p[indices]  # Extract all points in cluster
-            
+
+            if len(cluster) == 0:
+                print(f"Warning: Cluster {i} is empty, skipping.")
+                continue  # Skip empty clusters
+
             # Compute cluster center (centroid)
             centroid = np.mean(cluster, axis=0)
-        
-            clustered_points.append(centroid)  
+            clustered_points.append(centroid)
 
         return clustered_points
 
