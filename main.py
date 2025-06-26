@@ -31,6 +31,13 @@ def user_utility_focus_b(a, b):
 def user_utility_even(a, b):
     return a * 0.5 + b * 0.5
 
+def make_normalized_utility(utility_func, min_a, max_a, min_b, max_b):
+    def normalized_utility(a, b):
+        norm_a = (a - min_a) / (max_a - min_a) if max_a > min_a else 0.0
+        norm_b = (b - min_b) / (max_b - min_b) if max_b > min_b else 0.0
+        return utility_func(norm_a, norm_b)
+    return normalized_utility
+
 # Map utility function names to their implementations
 UTILITY_FUNCTIONS = {
     "focus_a": user_utility_focus_a,
@@ -41,15 +48,16 @@ UTILITY_FUNCTIONS = {
 # Define command-line arguments
 parser = argparse.ArgumentParser(description="Run the MORL algorithm with configurable parameters.")
 parser.add_argument("--cfg", type=str, default="car", help="Configuration to use (e.g., nile, cheetah).")
-parser.add_argument("--i", type=bool, default=False, help="Enable or disable interactive mode (True/False).")
-parser.add_argument("--save", type=bool, default=False, help="Enable or disable saving results (True/False).")
+parser.add_argument("--i", action="store_true", help="Enable interactive mode.")
+parser.add_argument("--save", action="store_true", help="Enable saving results.")
 parser.add_argument("--log", type=bool, default=False, help="Enable or disable logging (True/False).")
-parser.add_argument("--has_t", type=bool, default=False, help="Enable or disable target checking (True/False).")
+parser.add_argument("--has_t", action="store_true", help="Enable target checking.")
 parser.add_argument("--t", type=str, default="[100, 100]", help="Target for the Nile River simulation (e.g., [-1, -1.5]).")
-parser.add_argument("--a", type=bool, default=False, help="Enable or disable artificial user selection (True/False).")
+parser.add_argument("--a", action="store_true", help="Enable artificial user selection.")
 parser.add_argument("--out", type=str, default="agent_performance.csv", help="Output file name for agent performance data.")
 parser.add_argument("--exp", type=str, default="no_interactive", help="Experiment type (e.g., no_interactive, interactive).")
 parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
+parser.add_argument("--norm", action="store_true", help="Enable normalization of utility function.")
 parser.add_argument("--uu", type=str, default="even", choices=UTILITY_FUNCTIONS.keys(), help="User utility function to use (e.g., focus_a, focus_b, even).")
 
 # Parse the arguments
@@ -70,11 +78,28 @@ TARGET = args.t  # Now correctly parsed as a NumPy array
 EXPERIMENT = args.exp
 OUTPUT = args.out
 SEED = args.seed
+NORM = args.norm
 
 E_NAUT = False
 
 # Retrieve the selected utility function
 user_utility = UTILITY_FUNCTIONS[args.uu]
+if NORM:
+    # Define the normalization parameters based on the configuration
+    if CONFIG == "cheetah":
+        min_a, max_a = -100, 10  # Example values for Cheetah River simulation
+        min_b, max_b = -100, 0  # Example values for Cheetah River simulation
+    elif CONFIG == "car":
+        min_a, max_a = -110, 0  # Example values for Car environment
+        min_b, max_b = -110, 0  # Example values for Car environment
+    elif CONFIG == "swimmer":
+        min_a, max_a = -100, 10
+        min_b, max_b = -100, 0
+    else:
+        raise ValueError(f"Unknown configuration: {CONFIG}")
+
+    # Wrap the user utility function with normalization
+    user_utility = make_normalized_utility(user_utility, min_a, max_a, min_b, max_b)
 
 # Register the custom environment
 register(
@@ -214,6 +239,8 @@ if __name__ == "__main__":
         delta_weight=config["delta_weight"],
         sparsity_coeff=config["sparsity_coeff"],
         log=LOG,
+        experiment_name= EXPERIMENT,
+        wandb_entity="henwei1998",
         seed=SEED,
         interactive=INTERACTIVE,
         artificial=ARTIFICIAL,
