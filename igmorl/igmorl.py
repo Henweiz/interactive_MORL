@@ -274,15 +274,8 @@ class PerformanceBuffer:
 
 
     def add(self, candidate, evaluation: np.ndarray):
-        """Adds a candidate to the buffer.
-
-        Args:
-            candidate: candidate to add
-            evaluation: evaluation of the candidate
-        """
-
         def center_eval(eval):
-            # Objectives must be positive
+            # Shift objectives to positive space
             return np.clip(eval + self.origin, 0.0, float("inf"))
 
         centered_eval = center_eval(evaluation)
@@ -293,16 +286,26 @@ class PerformanceBuffer:
         if buffer_id < 0 or buffer_id >= self.num_bins:
             return
 
-        if len(self.bins[buffer_id]) < self.max_size:
-            self.bins[buffer_id].append(deepcopy(candidate))
-            self.bins_evals[buffer_id].append(evaluation)
-        else:
-            for i in range(len(self.bins[buffer_id])):
-                stored_eval_centered = center_eval(self.bins_evals[buffer_id][i])
-                if np.linalg.norm(stored_eval_centered) < np.linalg.norm(centered_eval):
-                    self.bins[buffer_id][i] = deepcopy(candidate)
-                    self.bins_evals[buffer_id][i] = evaluation
-                    break
+        # Add candidate to bin
+        self.bins[buffer_id].append(deepcopy(candidate))
+        self.bins_evals[buffer_id].append(evaluation)
+
+        # Sort bin by distance to origin (descending = better)
+        bin_data = list(zip(self.bins[buffer_id], self.bins_evals[buffer_id]))
+        bin_data.sort(
+            key=lambda x: np.linalg.norm(center_eval(x[1])),
+            reverse=True  # keep better (farther) individuals
+        )
+
+        # Trim to max_size
+        bin_data = bin_data[:self.max_size]
+
+        # Unpack the sorted and trimmed lists
+        self.bins[buffer_id], self.bins_evals[buffer_id] = zip(*bin_data)
+        self.bins[buffer_id] = list(self.bins[buffer_id])
+        self.bins_evals[buffer_id] = list(self.bins_evals[buffer_id])
+
+
 
 
 
@@ -330,14 +333,14 @@ class IGMORL(MOAgent):
         evolutionary_iterations: int = 20,
         num_weight_candidates: int = 7,
         num_performance_buffer: int = 100,
-        performance_buffer_size: int = 2,
+        performance_buffer_size: int = 4,
         min_weight: float = 0.0,
         max_weight: float = 1.0,
         delta_weight: float = 0.2,
         env=None,
         gamma: float = 0.995,
-        project_name: str = "MORL-baselines",
-        experiment_name: str = "PGMORL",
+        project_name: str = "Interactive-MORL",
+        experiment_name: str = "IGMORL",
         wandb_entity: Optional[str] = None,
         seed: Optional[int] = None,
         log: bool = True,
@@ -472,7 +475,20 @@ class IGMORL(MOAgent):
         # Logging
         self.log = log
         if self.log:
-            self.setup_wandb(project_name, experiment_name, wandb_entity, group)
+            self.full_experiment_name = f"{experiment_name}__{self.seed}__{int(time.time())}"
+            import wandb
+
+            wandb.init(
+                project=project_name,
+                entity=wandb_entity,
+                config=self.get_config(),
+                name=self.full_experiment_name,
+                save_code=True,
+                group=group,
+                mode="offline"
+            )
+            # The default "step" of wandb is not the actual time step (gloabl_step) of the MDP
+            wandb.define_metric("*", step_metric="global_step")
 
         self.networks = [
             MOPPONet(
@@ -493,7 +509,7 @@ class IGMORL(MOAgent):
                 self.networks[i],
                 weights[i],
                 self.env,
-                log=self.log,
+                log=False,
                 gamma=self.gamma,
                 device=self.device,
                 seed=self.seed,
@@ -724,6 +740,14 @@ class IGMORL(MOAgent):
                 ref_point=ref_point,
                 known_pareto_front=known_pareto_front,
             )
+            if self.log:
+                _, utility = utils.artifical_user_selection2(self.user_utility, self.population.evaluations)
+                wandb.log(
+                        {
+                            "eval/population_utility": self.population_utility(),
+                            "eval/highest_utility": utility
+                        }
+                    )
 
             # Evolution Phase
             max_iterations = max(max_iterations, self.warmup_iterations + self.evolutionary_iterations)
@@ -734,8 +758,9 @@ class IGMORL(MOAgent):
                 print(f"Evolutionary generation #{evolutionary_generation}")
 
                 if self.log:
+                    _, utility = utils.artifical_user_selection2(self.user_utility, self.population.evaluations)
                     wandb.log(
-                        {"charts/evolutionary_generation": evolutionary_generation, "global_step": self.global_step},
+                        {"charts/evolutionary_generation": evolutionary_generation, "global_step": self.global_step,}
                     )
 
                 for _ in range(self.evolutionary_iterations):
@@ -766,6 +791,14 @@ class IGMORL(MOAgent):
                     'global_step': self.global_step,
                     'pareto_front': deepcopy(self.archive.evaluations)
                 })
+                if self.log:
+                    _, utility = utils.artifical_user_selection2(self.user_utility, self.population.evaluations)
+                    wandb.log(
+                            {
+                                "eval/population_utility": self.population_utility(),
+                                "eval/highest_utility": utility
+                            }
+                        )
 
                 # Check if the target is achieved
                 if self.has_target:
@@ -846,6 +879,15 @@ class IGMORL(MOAgent):
         else:
             print("No target defined.")
             return None
+        
+    def population_utility(self):
+        """Calculates the utility of the current population."""
+        if self.user_utility is not None:
+            average = np.mean([self.user_utility(*eval) for eval in self.population.filtered_evaluations(self.bounds)])
+            return average
+        else:
+            print("No user utility function defined.")
+            return 0
 
 
 def make_env(env_id, seed, idx, run_name, gamma):

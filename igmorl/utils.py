@@ -82,7 +82,7 @@ def artifical_user_selection(function, pareto_points, agents):
 
     return selected_agent, selected_evaluation
 
-def artifical_user_selection(function, points):
+def artifical_user_selection2(function, points):
     """
     Simulates a user selection of points from the Pareto front.
     
@@ -95,21 +95,22 @@ def artifical_user_selection(function, points):
     - selected_agents: List of selected agents.
     - selected_evaluations: List of selected evaluations.
     """
+    points = np.array(points)  # Add this line
     assert len(points) > 0, "Pareto points cannot be empty."
     assert function
-    assert isinstance(points, np.ndarray) and points.ndim == 2 and points.shape[1] == 2, \
-        f"points must be a 2D numpy array of shape (N, 2), got {type(points)} with shape {getattr(points, 'shape', None)}"
+    #assert isinstance(points, np.ndarray) and points.ndim == 2 and points.shape[1] == 2, \
+    #    f"points must be a 2D numpy array of shape (N, 2), got {type(points)} with shape {getattr(points, 'shape', None)}"
     print(points)
 
     selected_point = None
     max_val = -np.inf
 
     for i in range(len(points)):
-        val = function(points[i,0], points[i,1])
+        val = function(points[i, 0], points[i, 1])
         if val >= max_val:
             max_val = val
             selected_point = points[i]
 
     print(f"User utility value: {max_val}")
 
-    return selected_point
+    return selected_point, max_val
