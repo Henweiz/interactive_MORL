@@ -4,10 +4,10 @@ import numpy as np
 
 # --- Filtering options ---
 FILTER_BOUNDS = True
-FILTER_PARETO = False
+FILTER_PARETO = True
 
 # Read the data from CSV file
-df = pd.read_csv('results/cheetah/norm/42.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
+df = pd.read_csv('results/car/norm/all_cleaned.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
 
 # Remove square brackets and split the vectorial column into x and y components
 df['Vectorial Reward'] = df['Vectorial Reward'].str.strip("[]")  # Remove square brackets
@@ -50,7 +50,7 @@ plt.figure(figsize=(12, 7))
 for type_name, color in color_map.items():
     subset = plot_df[plot_df['type'] == type_name]
     # Scatter plot for vectorial rewards
-    plt.scatter(subset['x'], subset['y'], color=color, label=type_name, alpha=0.7, s=100)
+    plt.scatter(subset['x'], subset['y'], color=color, label=type_name, alpha=1, s=100)
 
 # Add labels and title
 plt.xlabel('X Component', fontsize=12)

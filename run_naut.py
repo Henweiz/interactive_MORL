@@ -18,31 +18,29 @@ from matplotlib.animation import FuncAnimation
 def run_e_naut(type='no_interactive', file_path='agent_performance.csv', artificial=True, user_utility=lambda a, b: a * 0.5 + b * 0.5):
     df = pd.read_csv(file_path, header=None, names=['type', 'agent_id', 'vectorial', 'weights', 'bounds'])
 
-    # Debug: Print the first few rows of the DataFrame to inspect the 'vectorial' column
-    print("Original DataFrame:")
-    print(df.head())
-
     # Convert the 'vectorial' column from strings to lists of floats
     df['vectorial'] = df['vectorial'].apply(lambda x: np.array(list(map(float, x.strip("[]").replace(" ", "").split(";")))))
 
-    # Debug: Print the processed 'vectorial' column to ensure proper conversion
-    print("Processed 'vectorial' column:")
-    print(df['vectorial'].head())
-
     # Filter for non-interactive agents
     non_interactive = df[df['type'] == type]
-    print("Filtered non-interactive agents:")
-    print(non_interactive.head())
 
     # Convert the 'vectorial' column to a 2D NumPy array
     vectorial_array = np.vstack(non_interactive['vectorial'].values)
 
-    # Debug: Print the resulting 2D NumPy array
-    print("2D NumPy array:")
-    print(vectorial_array)
+    # Pareto filtering function
+    def pareto_filter(points):
+        is_pareto = np.ones(points.shape[0], dtype=bool)
+        for i, point in enumerate(points):
+            if is_pareto[i]:
+                is_pareto[is_pareto] = np.any(points[is_pareto] > point, axis=1) | np.all(points[is_pareto] == point, axis=1)
+                is_pareto[i] = True  # Keep self
+        return points[is_pareto]
 
-    # Pass the 2D array to E_NAUTILUS
-    e_nautilus = E_NAUTILUS(vectorial_array, artificial=artificial, user_utility=user_utility)
+    # Pareto filter the points before running E_NAUTILUS
+    pareto_points = pareto_filter(vectorial_array)
+
+    # Pass the Pareto-filtered array to E_NAUTILUS
+    e_nautilus = E_NAUTILUS(pareto_points, artificial=artificial, user_utility=user_utility)
 
     selected_solution = e_nautilus.run()
     print("Final Selected Solution:", selected_solution)

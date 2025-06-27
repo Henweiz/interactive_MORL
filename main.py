@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import gymnasium as gym
 from gymnasium.envs.registration import register
-from igmorl.igmorl import IGMORL, make_env
+from igmorl.igmorl import IGMORL, make_env, make_unnormalized_env
 from igmorl.e_nautilus import E_NAUTILUS
 from matplotlib.animation import FuncAnimation
 import json
@@ -266,13 +266,13 @@ if __name__ == "__main__":
     elapsed_time = time.time() - start_time
     print(f"Training completed in {str(datetime.timedelta(seconds=int(elapsed_time)))} (hh:mm:ss)")
 
-    env = make_env(config['env_id'], (SEED-1), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
+    #env = make_env(config['env_id'], (SEED-1), 1, "PGMORL_test", gamma=0.995)()  # idx != -1 to avoid taking videos
 
     print(algo.archive.evaluations)
     print(f"Boundaries: {bounds}")
     
     # Save the video in the current directory
-    save_path = os.path.join(os.getcwd(), "pareto_front_evolution.mp4")
+    #save_path = os.path.join(os.getcwd(), "pareto_front_evolution.mp4")
     #plot_pareto_progression(history, show=True, save_path=save_path)
     
 
@@ -289,6 +289,7 @@ if __name__ == "__main__":
             'Vectorial Reward': ";".join(map(str, e)),  # Convert list to string for CSV
             'Weights': ";".join(map(str, a.np_weights.tolist())),  # Convert weights to string
             'Bounds': ";".join(map(str, bounds)),  # Add bounds as a string
+            'Run Time': str(datetime.timedelta(seconds=int(elapsed_time)))
         }
 
         # Append agent data to the list

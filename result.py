@@ -5,8 +5,8 @@ from run_naut import run_e_naut
 USE_NAUTILUS = True
 
 # Load the data
-file_path = 'results/cheetah/norm/1.csv'
-type = "no_interactive_cheetah_1"
+file_path = 'results/cheetah/norm/all_cleaned.csv'
+type = "no_interactive_cheetah"
 
 df = pd.read_csv(file_path, header=None, 
                  names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
@@ -94,3 +94,6 @@ if USE_NAUTILUS:
     best_values = pd.concat([best_values, pd.DataFrame([enautilus_row])], ignore_index=True)
 
 print(best_values)
+print(f"e-nautilus_selected_even_point,0,{enautilus_even[0]};{enautilus_even[1]}")
+print(f"e-nautilus_selected_focus_a_point,1,{enautilus_focus_a[0]};{enautilus_focus_a[1]}")
+print(f"e-nautilus_selected_focus_b_point,2,{enautilus_focus_b[0]};{enautilus_focus_b[1]}")
