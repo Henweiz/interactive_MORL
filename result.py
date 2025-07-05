@@ -5,11 +5,11 @@ from run_naut import run_e_naut
 USE_NAUTILUS = True
 
 # Load the data
-file_path = 'results/cheetah/norm/all_cleaned.csv'
-type = "no_interactive_cheetah"
+file_path = 'results/car/norm/3all_cleaned.csv'
+type = "no_interactive_mocar"
 
 df = pd.read_csv(file_path, header=None, 
-                 names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
+                 names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds', 'time'])
 
 # Remove square brackets and split the vectorial column into x and y components
 df['Vectorial Reward'] = df['Vectorial Reward'].str.strip("[]")

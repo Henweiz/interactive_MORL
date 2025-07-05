@@ -16,7 +16,7 @@ from matplotlib.animation import FuncAnimation
 
 
 def run_e_naut(type='no_interactive', file_path='agent_performance.csv', artificial=True, user_utility=lambda a, b: a * 0.5 + b * 0.5):
-    df = pd.read_csv(file_path, header=None, names=['type', 'agent_id', 'vectorial', 'weights', 'bounds'])
+    df = pd.read_csv(file_path, header=None, names=['type', 'agent_id', 'vectorial', 'weights', 'bounds', 'time'])
 
     # Convert the 'vectorial' column from strings to lists of floats
     df['vectorial'] = df['vectorial'].apply(lambda x: np.array(list(map(float, x.strip("[]").replace(" ", "").split(";")))))

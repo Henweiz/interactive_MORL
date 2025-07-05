@@ -855,7 +855,7 @@ class IGMORL(MOAgent):
             print("\nSelected Agent Details:")
             print(f"ID: {selected_agent.id}")
             print(f"Weights: {selected_agent.np_weights}")
-            print(f"Evaluation: {self.bounds}")  # Reverse the scaling to show the original evaluation
+            print(f"Evaluation: {selected_evaluation}")  # Reverse the scaling to show the original evaluation
             return [selected_agent, self.bounds]
         else:
             print("No agent selected.")
@@ -929,6 +929,24 @@ def make_env(env_id, seed, idx, run_name, gamma):
         return env
 
     return thunk
+
+def make_unnormalized_env(env_id, seed, idx, run_name, gamma):
+    def thunk():
+        if idx == -1:
+            env = mo_gym.make(env_id, render_mode="human")
+        else:
+            env = mo_gym.make(env_id)
+        # ✅ No reward normalization or clipping
+        env = gym.wrappers.ClipAction(env)
+        env = gym.wrappers.NormalizeObservation(env)
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), env.observation_space)
+        env = MORecordEpisodeStatistics(env, gamma=gamma)  # Still track discounted reward
+        env.reset(seed=seed)
+        env.action_space.seed(seed)
+        env.observation_space.seed(seed)
+        return env
+    return thunk
+
 
 class MORecordEpisodeStatistics(RecordEpisodeStatistics, gym.utils.RecordConstructorArgs):
     """This wrapper will keep track of cumulative rewards and episode lengths.

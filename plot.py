@@ -5,9 +5,10 @@ import numpy as np
 # --- Filtering options ---
 FILTER_BOUNDS = True
 FILTER_PARETO = True
+EXCLUDE_TYPE = "no_interactive_cheetah"  # Set to a type string to exclude, e.g., "no_interactive_cheetah_55_1"
 
 # Read the data from CSV file
-df = pd.read_csv('results/car/norm/all_cleaned.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds'])
+df = pd.read_csv('results/cheetah/norm/all_cleaned.csv', header=None, names=['type', 'agent_id', 'Vectorial Reward', 'weights', 'bounds', 'time'])
 
 # Remove square brackets and split the vectorial column into x and y components
 df['Vectorial Reward'] = df['Vectorial Reward'].str.strip("[]")  # Remove square brackets
@@ -16,6 +17,10 @@ df[['x', 'y']] = df['Vectorial Reward'].str.split(';', expand=True).astype(float
 # Split the bounds column into x and y components
 df['bounds'] = df['bounds'].str.strip("[]")  # Remove square brackets
 df[['bound_x', 'bound_y']] = df['bounds'].str.split(';', expand=True).astype(float)
+
+# Exclude a specific type if set
+if EXCLUDE_TYPE is not None:
+    df = df[df['type'] != EXCLUDE_TYPE]
 
 # Apply bounds filtering if enabled
 if FILTER_BOUNDS:
@@ -33,9 +38,12 @@ def pareto_filter(df, x_col='x', y_col='y'):
             is_pareto[i] = True  # Keep self
     return df[is_pareto]
 
-# Apply Pareto filtering if enabled
+# Apply Pareto filtering within each type if enabled
 if FILTER_PARETO:
-    plot_df = pareto_filter(filtered_df)
+    plot_df = pd.concat(
+        [pareto_filter(group) for _, group in filtered_df.groupby('type')],
+        ignore_index=True
+    )
 else:
     plot_df = filtered_df
 
